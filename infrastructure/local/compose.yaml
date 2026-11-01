@@ -1,0 +1,30 @@
+name: dutch-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dutch_local_admin
+      POSTGRES_PASSWORD: ${DUTCH_LOCAL_POSTGRES_SUPERUSER_PASSWORD:?Copy .env.example to .env and set a local password.}
+      POSTGRES_DB: postgres
+      DUTCH_LOCAL_IAM_MIGRATION_PASSWORD: ${DUTCH_LOCAL_IAM_MIGRATION_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_IAM_RUNTIME_PASSWORD: ${DUTCH_LOCAL_IAM_RUNTIME_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_UMS_MIGRATION_PASSWORD: ${DUTCH_LOCAL_UMS_MIGRATION_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_UMS_RUNTIME_PASSWORD: ${DUTCH_LOCAL_UMS_RUNTIME_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_LEDGER_MIGRATION_PASSWORD: ${DUTCH_LOCAL_LEDGER_MIGRATION_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_LEDGER_RUNTIME_PASSWORD: ${DUTCH_LOCAL_LEDGER_RUNTIME_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_NOTIFICATION_MIGRATION_PASSWORD: ${DUTCH_LOCAL_NOTIFICATION_MIGRATION_PASSWORD:?Set in .env}
+      DUTCH_LOCAL_NOTIFICATION_RUNTIME_PASSWORD: ${DUTCH_LOCAL_NOTIFICATION_RUNTIME_PASSWORD:?Set in .env}
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - dutch-postgres-data:/var/lib/postgresql/data
+      - ./init/01-create-service-databases.sh:/docker-entrypoint-initdb.d/01-create-service-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dutch_local_admin -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  dutch-postgres-data:

@@ -1,0 +1,31 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- assertVisible: "Your groups."
+- tapOn: "Flat 12"
+- tapOn: "New expense"
+- assertVisible: "New expense"
+- tapOn:
+    id: "expense-description"
+- inputText: "Dinner"
+- tapOn:
+    id: "expense-amount"
+- inputText: "100"
+- hideKeyboard
+- tapOn: "Create expense"
+- extendedWaitUntil:
+    visible: "Recorded"
+    timeout: 10000
+- assertVisible: "Dinner"
+- assertVisible: ".*50.00 INR.*"
+- assertVisible: ".*owes.*"
+- takeScreenshot: android-expense-result
+- tapOn: "Done"
+- assertVisible: "Flat 12"

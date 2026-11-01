@@ -119,6 +119,16 @@ export default function GroupDetailScreen() {
 
       {error ? <Text style={styles.notice}>{error}</Text> : null}
 
+      {viewer?.state === 'ACTIVE' ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(`/expense/new?groupId=${group.id}`)}
+          style={styles.primary}
+        >
+          <Text style={styles.primaryLabel}>New expense</Text>
+        </Pressable>
+      ) : null}
+
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Members</Text>
         {group.memberships.map((membership) => (

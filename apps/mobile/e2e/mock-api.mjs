@@ -27,6 +27,7 @@ function seedGroups() {
 }
 
 let groups = seedGroups();
+const expenses = new Map();
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -62,6 +63,7 @@ const server = createServer(async (request, response) => {
   if (request.method === 'POST' && request.url === '/reset') {
     profileStateReads = 0;
     groups = seedGroups();
+    expenses.clear();
     response.writeHead(204).end();
     return;
   }
@@ -106,6 +108,74 @@ const server = createServer(async (request, response) => {
       : null;
     if (request.method === 'GET' && parts.length === 4) {
       json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'expenses' && parts.length === 5) {
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (idempotencyKey && expenses.has(idempotencyKey)) {
+        json(response, 200, { data: expenses.get(idempotencyKey) });
+        return;
+      }
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      const total = Number(payload.totalMinorUnits);
+      const participants = payload.participants ?? [];
+      const payers = payload.payers ?? [];
+      const base = Math.floor(total / participants.length);
+      const remainder = total % participants.length;
+      const shares = participants.map((memberId, index) => ({
+        memberId,
+        minorUnits: base + (index < remainder ? 1 : 0)
+      }));
+      const positions = new Map();
+      for (const payer of payers) {
+        positions.set(payer.memberId, (positions.get(payer.memberId) ?? 0) + payer.minorUnits);
+      }
+      for (const share of shares) {
+        positions.set(share.memberId, (positions.get(share.memberId) ?? 0) - share.minorUnits);
+      }
+      const debtors = [...positions].filter(([, value]) => value < 0)
+        .map(([memberId, value]) => ({ memberId, amount: -value }))
+        .sort((a, b) => b.amount - a.amount || a.memberId.localeCompare(b.memberId));
+      const creditors = [...positions].filter(([, value]) => value > 0)
+        .map(([memberId, value]) => ({ memberId, amount: value }))
+        .sort((a, b) => b.amount - a.amount || a.memberId.localeCompare(b.memberId));
+      const expenseId = `exp_${randomUUID().replaceAll('-', '')}`;
+      const entries = [];
+      let debtorIndex = 0;
+      let creditorIndex = 0;
+      while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
+        const amount = Math.min(debtors[debtorIndex].amount, creditors[creditorIndex].amount);
+        if (amount > 0) {
+          entries.push({
+            expenseId,
+            revision: 1,
+            debtor: debtors[debtorIndex].memberId,
+            creditor: creditors[creditorIndex].memberId,
+            minorUnits: amount,
+            currency: payload.currency,
+            algorithmVersion: 'expense-allocation-v1'
+          });
+        }
+        debtors[debtorIndex].amount -= amount;
+        creditors[creditorIndex].amount -= amount;
+        if (debtors[debtorIndex].amount === 0) debtorIndex += 1;
+        if (creditors[creditorIndex].amount === 0) creditorIndex += 1;
+      }
+      const expense = {
+        id: expenseId,
+        groupId: group.id,
+        description: payload.description,
+        totalMinorUnits: total,
+        currency: payload.currency,
+        splitMethod: payload.splitMethod,
+        payers,
+        shares,
+        entries,
+        occurredAt: payload.occurredAt,
+        revision: 1
+      };
+      if (idempotencyKey) expenses.set(idempotencyKey, expense);
+      json(response, 200, { data: expense });
       return;
     }
     if (request.method === 'POST' && parts[4] === 'members' && parts.length === 5) {

@@ -36,6 +36,7 @@ class JdbcGroupMembershipEventConsumerIntegrationTest {
     static final PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("ledger_membership_event_test");
 
+    private static JdbcTemplate jdbc;
     private static GroupRepository repository;
     private static JdbcGroupMembershipEventConsumer consumer;
     private static TransactionTemplate transactions;
@@ -46,7 +47,7 @@ class JdbcGroupMembershipEventConsumerIntegrationTest {
                 .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
                 .load()
                 .migrate();
-        JdbcTemplate jdbc = new JdbcTemplate(new DriverManagerDataSource(
+        jdbc = new JdbcTemplate(new DriverManagerDataSource(
                 database.getJdbcUrl(), database.getUsername(), database.getPassword()));
         repository = new JdbcGroupRepository(jdbc);
         consumer = new JdbcGroupMembershipEventConsumer(jdbc, repository);
@@ -84,6 +85,19 @@ class JdbcGroupMembershipEventConsumerIntegrationTest {
     }
 
     @Test
+    void a_stale_event_does_not_write_a_dedupe_row() {
+        GroupId id = new GroupId("grp_712345678901234567");
+        transactions.executeWithoutResult(status ->
+                repository.saveNew(Group.create(id, "Flat", "INR", ADMIN, NOW)));
+        Group group = repository.findById(id).orElseThrow();
+        group.invite(ADMIN, MEMBER, GroupRole.MEMBER, NOW);
+        transactions.executeWithoutResult(status -> repository.save(group, 0));
+
+        assertThat(apply(event("evt_stale", id, 1, MEMBER, MembershipState.ACTIVE, GroupRole.MEMBER))).isFalse();
+        assertThat(countEvents(id, 1)).isZero();
+    }
+
+    @Test
     void rejects_a_version_gap_without_advancing_the_group() {
         GroupId id = new GroupId("grp_512345678901234567");
         transactions.executeWithoutResult(status ->
@@ -94,6 +108,7 @@ class JdbcGroupMembershipEventConsumerIntegrationTest {
                 .isInstanceOf(GroupRuleException.class);
 
         assertThat(repository.findById(id).orElseThrow().version()).isZero();
+        assertThat(countEvents(id, 2)).isZero();
     }
 
     @Test
@@ -107,6 +122,15 @@ class JdbcGroupMembershipEventConsumerIntegrationTest {
                 .isInstanceOf(GroupRuleException.class);
 
         assertThat(repository.findById(id).orElseThrow().version()).isZero();
+        assertThat(countEvents(id, 1)).isZero();
+    }
+
+    private static long countEvents(GroupId groupId, long version) {
+        Long count = jdbc.queryForObject("""
+                SELECT count(*) FROM group_membership_event
+                WHERE group_id = ? AND aggregate_version = ?
+                """, Long.class, groupId.value(), version);
+        return count == null ? 0 : count;
     }
 
     private static boolean apply(GroupMembershipEvent event) {

@@ -66,6 +66,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/groups/{groupId}/members:
     post:
       operationId: addMember
@@ -119,6 +121,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -142,6 +146,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -166,6 +172,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -189,6 +197,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -212,6 +222,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":

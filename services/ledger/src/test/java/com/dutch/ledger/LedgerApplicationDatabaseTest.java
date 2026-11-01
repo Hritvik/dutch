@@ -8,7 +8,6 @@ import com.dutch.ledger.group.JdbcGroupRepository;
 import com.dutch.ledger.group.JdbcMemberResolver;
 import com.dutch.ledger.group.MemberResolver;
 import com.dutch.ledger.mapping.JdbcMemberMappingConsumer;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -18,6 +17,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Boots the real service against PostgreSQL so the JDBC beans, Flyway, and the
@@ -26,14 +27,12 @@ import org.testcontainers.containers.PostgreSQLContainer;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Testcontainers(disabledWithoutDocker = true)
 class LedgerApplicationDatabaseTest {
 
-    private static final PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
+    @Container
+    static final PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("ledger_context_test");
-
-    static {
-        database.start();
-    }
 
     @MockBean
     private JwtDecoder jwtDecoder;
@@ -56,11 +55,6 @@ class LedgerApplicationDatabaseTest {
         registry.add("spring.datasource.username", database::getUsername);
         registry.add("spring.datasource.password", database::getPassword);
         registry.add("spring.flyway.enabled", () -> "true");
-    }
-
-    @AfterAll
-    static void stop() {
-        database.stop();
     }
 
     @Test

@@ -1,14 +1,8 @@
 -- Correction, settlement, and Activity evidence.
 ALTER TABLE obligation_entry
     ADD COLUMN entry_kind TEXT NOT NULL DEFAULT 'CHARGE'
-        CHECK (entry_kind IN ('CHARGE', 'REVERSAL', 'SETTLEMENT', 'SETTLEMENT_VOID')),
-    ADD COLUMN correction_id TEXT,
-    ADD COLUMN settlement_id TEXT,
-    ALTER COLUMN expense_id DROP NOT NULL,
-    ALTER COLUMN revision DROP NOT NULL,
-    ALTER COLUMN group_id DROP NOT NULL,
-    ADD CONSTRAINT obligation_entry_single_source
-        CHECK ((expense_id IS NOT NULL) <> (settlement_id IS NOT NULL));
+        CHECK (entry_kind IN ('CHARGE', 'REVERSAL')),
+    ADD COLUMN correction_id TEXT;
 
 ALTER TABLE obligation_entry
     DROP CONSTRAINT IF EXISTS obligation_entry_expense_id_revision_debtor_member_id_credi_key;
@@ -20,10 +14,6 @@ CREATE UNIQUE INDEX obligation_entry_charge_pair
 CREATE UNIQUE INDEX obligation_entry_reversal_pair
     ON obligation_entry (correction_id, debtor_member_id, creditor_member_id)
     WHERE entry_kind = 'REVERSAL';
-
-CREATE UNIQUE INDEX obligation_entry_settlement_pair
-    ON obligation_entry (settlement_id, stream_id, debtor_member_id, creditor_member_id)
-    WHERE settlement_id IS NOT NULL;
 
 -- Reversal entries are evidence of a prior revision and are not part of the new
 -- revision's contribution/share net; only CHARGE entries participate in the check.
@@ -131,10 +121,6 @@ CREATE TABLE settlement_void (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE obligation_entry
-    ADD CONSTRAINT obligation_entry_settlement_fk
-        FOREIGN KEY (settlement_id) REFERENCES settlement (settlement_id);
-
 CREATE TABLE activity_entry (
     activity_id TEXT PRIMARY KEY CHECK (activity_id ~ '^act_[A-Za-z0-9_-]{16,128}$'),
     scope_id TEXT NOT NULL,
@@ -190,28 +176,9 @@ DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION settlement_allocations_balance();
 
 CREATE CONSTRAINT TRIGGER settlement_allocation_requires_balance
-AFTER INSERT ON settlement_allocation
+AFTER INSERT OR UPDATE OR DELETE ON settlement_allocation
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION settlement_allocations_balance();
-
--- The parent may only move ACTIVE -> VOIDED once; its financial fields are fixed.
-CREATE OR REPLACE FUNCTION settlement_only_voidable() RETURNS trigger AS $$
-BEGIN
-    IF NEW.settlement_id = OLD.settlement_id
-       AND NEW.payer_member_id = OLD.payer_member_id
-       AND NEW.payee_member_id = OLD.payee_member_id
-       AND NEW.total_minor_units = OLD.total_minor_units
-       AND NEW.currency = OLD.currency
-       AND NEW.occurred_at = OLD.occurred_at
-       AND OLD.status = 'ACTIVE' AND NEW.status = 'VOIDED' THEN
-        RETURN NEW;
-    END IF;
-    RAISE EXCEPTION 'settlement is immutable except for a one-way void';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER settlement_only_voidable BEFORE UPDATE ON settlement
-FOR EACH ROW EXECUTE FUNCTION settlement_only_voidable();
 
 CREATE TRIGGER expense_correction_immutable BEFORE UPDATE OR DELETE ON expense_correction
 FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();

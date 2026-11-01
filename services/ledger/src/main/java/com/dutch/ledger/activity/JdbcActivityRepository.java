@@ -41,11 +41,11 @@ public class JdbcActivityRepository implements ActivityRepository {
 
     @Override
     public List<ActivityEntry> forScope(String scopeId) {
-        return jdbc.query("""
+        java.util.List<ActivityEntry> entries = jdbc.query("""
                 SELECT activity_id, scope_id, actor_member_id, action, target_id,
                     target_revision, occurred_at, details::text AS details
                 FROM activity_entry WHERE scope_id = ?
-                ORDER BY occurred_at, activity_id
+                ORDER BY occurred_at DESC, activity_id DESC
                 LIMIT 500
                 """, (result, index) -> new ActivityEntry(
                 result.getString("activity_id"),
@@ -57,6 +57,8 @@ public class JdbcActivityRepository implements ActivityRepository {
                 result.getLong("target_revision"),
                 result.getTimestamp("occurred_at").toInstant(),
                 readDetails(result.getString("details"))), scopeId);
+        java.util.Collections.reverse(entries);
+        return java.util.List.copyOf(entries);
     }
 
     private String details(ActivityEntry entry) {

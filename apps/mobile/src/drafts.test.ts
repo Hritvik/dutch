@@ -10,6 +10,7 @@ import {
   markCorrectionStale,
   reReviewCorrection,
   reviewCorrection,
+  retryCorrection,
   submitCorrection
 } from './drafts';
 
@@ -46,6 +47,15 @@ test('a stale response preserves fields and refreshes the source revision', () =
   assert.equal(stale.idempotencyKey, undefined);
   assert.equal(reReviewCorrection(stale).state, 'readyToReview');
   assert.throws(() => reReviewCorrection(draft));
+});
+
+test('an ambiguous failure keeps the command key for the retry', () => {
+  const submitting = submitCorrection(reviewCorrection(draft), 'key-1');
+  const retry = retryCorrection(submitting);
+  assert.equal(retry.state, 'readyToReview');
+  assert.equal(retry.idempotencyKey, 'key-1');
+  assert.equal(submitCorrection(retry, 'ignored').idempotencyKey, 'key-1');
+  assert.throws(() => retryCorrection(draft));
 });
 
 test('acceptance and validation outcomes are terminal for the send', () => {

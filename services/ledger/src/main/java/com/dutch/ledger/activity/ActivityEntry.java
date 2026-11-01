@@ -30,6 +30,14 @@ public record ActivityEntry(
             "description", "totalMinorUnits", "currency", "fromRevision", "toRevision",
             "status", "role");
 
+    /** Returns null when free text would leak a contact identifier. */
+    public static String contactFree(String value) {
+        if (value == null) {
+            return null;
+        }
+        return EMAIL.matcher(value).find() || PHONE.matcher(value).find() ? null : value;
+    }
+
     public ActivityEntry {
         if (activityId == null || !ID.matcher(activityId).matches()) {
             throw new IllegalArgumentException("activityId does not match the pinned format");

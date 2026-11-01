@@ -28,6 +28,7 @@ import {
   equalShares,
   markCorrectionStale,
   reReviewCorrection,
+  retryCorrection,
   reviewCorrection,
   submitCorrection,
   type CorrectionDraft
@@ -151,7 +152,8 @@ export default function NewExpenseScreen() {
     }
     setCorrecting(true);
     setCorrectionError(null);
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const key = draft.idempotencyKey
+      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const submitting = submitCorrection(draft, key);
     setDraft(submitting);
     try {
@@ -193,10 +195,13 @@ export default function NewExpenseScreen() {
         }
       } else if (failure instanceof ExpenseHttpError && failure.code === 'idempotency_conflict') {
         setDraft(editCorrection(submitting, {}));
+        setCorrectionStep('edit');
         setCorrectionError('This draft was already sent with different details. Review it again.');
       } else {
-        setDraft(editCorrection(submitting, {}));
-        setCorrectionError('We could not correct the expense. Your draft is kept; try again.');
+        setDraft(retryCorrection(submitting));
+        setCorrectionStep('review');
+        setCorrectionError(
+          'We could not confirm the correction. Your draft is kept; retry with the same command.');
       }
     } finally {
       setCorrecting(false);

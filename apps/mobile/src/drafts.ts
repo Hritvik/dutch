@@ -65,6 +65,14 @@ export function submitCorrection(draft: CorrectionDraft, key: string): Correctio
   return { ...draft, state: 'submitting', idempotencyKey: draft.idempotencyKey ?? key };
 }
 
+/** An ambiguous failure keeps the key so the retry replays the same command. */
+export function retryCorrection(draft: CorrectionDraft): CorrectionDraft {
+  if (draft.state !== 'submitting') {
+    throw new Error('Only a submitted draft can be retried.');
+  }
+  return { ...draft, state: 'readyToReview' };
+}
+
 export function acceptCorrection(draft: CorrectionDraft): CorrectionDraft {
   return { ...draft, state: 'accepted' };
 }

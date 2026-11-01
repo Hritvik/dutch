@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.contains;
 
 import com.dutch.ledger.TestGroupConfiguration;
 import com.jayway.jsonpath.JsonPath;
@@ -61,9 +62,10 @@ class SettlementControllerTest {
 
         mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].action").value("SETTLEMENT_RECORDED"))
-                .andExpect(jsonPath("$.data[0].targetId").value(settlementId))
-                .andExpect(jsonPath("$.data[0].details.totalMinorUnits").value("100"));
+                .andExpect(jsonPath("$.data[?(@.action == 'SETTLEMENT_RECORDED')].targetId")
+                        .value(contains(settlementId)))
+                .andExpect(jsonPath("$.data[?(@.action == 'SETTLEMENT_RECORDED')].details.totalMinorUnits")
+                        .value(contains("100")));
 
         String voidKey = "void-" + UUID.randomUUID();
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/settlements/" + settlementId + "/void")
@@ -88,8 +90,8 @@ class SettlementControllerTest {
         mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[1].action").value("SETTLEMENT_VOIDED"))
-                .andExpect(jsonPath("$.data[1].details.status").value("VOIDED"));
+                .andExpect(jsonPath("$.data[?(@.action == 'SETTLEMENT_VOIDED')].details.status")
+                        .value(contains("VOIDED")));
     }
 
     @Test

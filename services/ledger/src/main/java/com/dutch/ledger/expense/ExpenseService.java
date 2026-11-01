@@ -15,7 +15,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -79,12 +78,17 @@ public class ExpenseService {
         Expense expense = build(group, request);
         expenses.save(expense);
         Instant now = Instant.now();
+        java.util.Map<String, String> details = new java.util.HashMap<>();
+        String safeDescription = ActivityEntry.contactFree(expense.description());
+        if (safeDescription != null) {
+            details.put("description", safeDescription);
+        }
+        details.put("totalMinorUnits", Long.toString(expense.totalMinorUnits()));
+        details.put("currency", expense.currency());
         activity.append(new ActivityEntry("act_" + UUID.randomUUID().toString().replace("-", ""),
                 "group:" + group.id().value() + ":" + group.currency(), actor,
                 ActivityAction.EXPENSE_CREATED, expense.id().value(), expense.revision(), now,
-                Map.of("description", expense.description(),
-                        "totalMinorUnits", Long.toString(expense.totalMinorUnits()),
-                        "currency", expense.currency())));
+                details));
         ExpenseView view = ExpenseView.from(expense);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;

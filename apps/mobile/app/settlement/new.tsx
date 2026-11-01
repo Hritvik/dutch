@@ -273,6 +273,7 @@ export default function NewSettlementScreen() {
             key={membership.memberId}
             accessibilityRole="button"
             onPress={() => {
+              if (membership.memberId === memberId) return;
               setMemberId(membership.memberId);
               idempotencyKey.current = null;
               occurredAt.current = null;
@@ -293,6 +294,7 @@ export default function NewSettlementScreen() {
             key={membership.memberId}
             accessibilityRole="button"
             onPress={() => {
+              if (membership.memberId === payeeId) return;
               setPayeeId(membership.memberId);
               idempotencyKey.current = null;
               occurredAt.current = null;
@@ -310,9 +312,11 @@ export default function NewSettlementScreen() {
       <TextInput
         keyboardType="decimal-pad"
         onChangeText={(value) => {
+          if (value !== amount) {
+            idempotencyKey.current = null;
+            occurredAt.current = null;
+          }
           setAmount(value);
-          idempotencyKey.current = null;
-          occurredAt.current = null;
         }}
         placeholder="0.00"
         placeholderTextColor={MUTED}

@@ -90,14 +90,18 @@ public class CorrectionService {
         Expense replacement = ExpenseCommandFactory.create(group, current.id(), current.revision() + 1, request);
         ExpenseCorrection correction = ExpenseHistory.of(current).correct(replacement, actor, now);
         corrections.save(correction);
+        java.util.Map<String, String> details = new java.util.HashMap<>();
+        String safeDescription = ActivityEntry.contactFree(replacement.description());
+        if (safeDescription != null) {
+            details.put("description", safeDescription);
+        }
+        details.put("totalMinorUnits", Long.toString(replacement.totalMinorUnits()));
+        details.put("currency", replacement.currency());
+        details.put("fromRevision", Long.toString(current.revision()));
+        details.put("toRevision", Long.toString(replacement.revision()));
         activity.append(new ActivityEntry("act_" + UUID.randomUUID().toString().replace("-", ""),
                 scopeId(group, current.currency()), actor, ActivityAction.EXPENSE_CORRECTED,
-                expenseId, replacement.revision(), now, Map.of(
-                "description", replacement.description(),
-                "totalMinorUnits", Long.toString(replacement.totalMinorUnits()),
-                "currency", replacement.currency(),
-                "fromRevision", Long.toString(current.revision()),
-                "toRevision", Long.toString(replacement.revision()))));
+                expenseId, replacement.revision(), now, details));
 
         ExpenseView view = ExpenseView.from(replacement);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));

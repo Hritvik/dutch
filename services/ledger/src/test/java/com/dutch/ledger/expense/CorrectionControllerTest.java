@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.contains;
 
 import com.dutch.ledger.TestGroupConfiguration;
 import com.jayway.jsonpath.JsonPath;
@@ -58,10 +59,12 @@ class CorrectionControllerTest {
 
         mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[1].action").value("EXPENSE_CORRECTED"))
-                .andExpect(jsonPath("$.data[1].details.fromRevision").value("1"))
-                .andExpect(jsonPath("$.data[1].details.toRevision").value("2"))
-                .andExpect(jsonPath("$.data[1].details.totalMinorUnits").value("120"));
+                .andExpect(jsonPath("$.data[?(@.action == 'EXPENSE_CORRECTED')].details.totalMinorUnits")
+                        .value(contains("120")))
+                .andExpect(jsonPath("$.data[?(@.action == 'EXPENSE_CORRECTED')].details.fromRevision")
+                        .value(contains("1")))
+                .andExpect(jsonPath("$.data[?(@.action == 'EXPENSE_CORRECTED')].details.toRevision")
+                        .value(contains("2")));
     }
 
     @Test
@@ -76,6 +79,12 @@ class CorrectionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(replacementJson(120)))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/groups/" + groupId + "/expenses/" + expenseId)
+                        .with(as(ADMIN_SUBJECT)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.revision").value(2))
+                .andExpect(jsonPath("$.data.totalMinorUnits").value(120));
 
         mockMvc.perform(post(path).with(as(ADMIN_SUBJECT))
                         .header("Idempotency-Key", "correction-stale")
@@ -95,8 +104,8 @@ class CorrectionControllerTest {
         mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[1].action").value("EXPENSE_CORRECTED"))
-                .andExpect(jsonPath("$.data[1].targetRevision").value(2));
+                .andExpect(jsonPath("$.data[?(@.action == 'EXPENSE_CORRECTED')].targetRevision")
+                        .value(contains(2)));
     }
 
     @Test

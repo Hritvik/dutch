@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.contains;
 
 import com.dutch.ledger.TestGroupConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +126,36 @@ class ExpenseControllerTest {
         java.util.List<?> entries = JsonPath.read(second, "$.data.entries");
         assertThat(firstId).isEqualTo(secondId);
         assertThat(entries.toString()).contains("50");
+
+        mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[?(@.action == 'EXPENSE_CREATED')].targetId")
+                        .value(contains(firstId)));
+    }
+
+    @Test
+    void a_contact_looking_description_never_blocks_the_expense_or_enters_activity() throws Exception {
+        String groupId = createGroup();
+        String body = """
+                {"description":"Airbnb receipt to ana@example.test","totalMinorUnits":100,
+                 "currency":"INR","splitMethod":"EQUAL",
+                 "payers":[{"memberId":"%s","minorUnits":100}],
+                 "participants":["%s","%s"],
+                 "occurredAt":"2026-11-01T00:00:00Z"}
+                """.formatted(ADMIN.value(), ADMIN.value(), MEMBER.value());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-contact")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].action").value("EXPENSE_CREATED"))
+                .andExpect(jsonPath("$.data[0].details.description").doesNotExist())
+                .andExpect(jsonPath("$.data[0].details.totalMinorUnits").value("100"));
     }
 
     @Test

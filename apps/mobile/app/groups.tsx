@@ -49,6 +49,14 @@ export default function GroupsScreen() {
         Balances stay separate per group and currency. Archived groups remain readable.
       </Text>
 
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push('/new-group')}
+        style={styles.primary}
+      >
+        <Text style={styles.primaryLabel}>New group</Text>
+      </Pressable>
+
       {groups === null ? (
         <View style={styles.centered}>
           <ActivityIndicator color={INK} />
@@ -115,6 +123,14 @@ const styles = StyleSheet.create({
   cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   cardTitle: { color: INK, flex: 1, fontSize: 17, fontWeight: '600' },
   badge: { color: MUTED, fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  primary: {
+    alignItems: 'center',
+    backgroundColor: ACCENT,
+    borderRadius: 14,
+    marginTop: 22,
+    paddingVertical: 14
+  },
+  primaryLabel: { color: PAPER, fontSize: 15, fontWeight: '600' },
   secondary: { alignSelf: 'flex-start', marginTop: 14, paddingVertical: 8 },
   secondaryLabel: { color: ACCENT, fontSize: 14, fontWeight: '600' }
 });

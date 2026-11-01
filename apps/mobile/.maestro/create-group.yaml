@@ -1,0 +1,22 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- assertVisible: "Your groups."
+- tapOn: "New group"
+- assertVisible: "New group."
+- tapOn:
+    id: "group-name"
+- inputText: "Goa trip"
+- hideKeyboard
+- tapOn: "Create group"
+- extendedWaitUntil:
+    visible: "Goa trip"
+    timeout: 10000
+- takeScreenshot: android-group-created

@@ -56,6 +56,17 @@ public final class Expense {
                                  String currency, SplitMethod splitMethod,
                                  List<PayerContribution> payers, List<ParticipantShare> shares,
                                  Instant occurredAt) {
+        return createAtRevision(id, groupId, description, totalMinorUnits, currency, splitMethod,
+                payers, shares, occurredAt, 1);
+    }
+
+    public static Expense createAtRevision(ExpenseId id, GroupId groupId, String description,
+                                           long totalMinorUnits, String currency, SplitMethod splitMethod,
+                                           List<PayerContribution> payers, List<ParticipantShare> shares,
+                                           Instant occurredAt, long revision) {
+        if (revision < 1) {
+            throw new IllegalArgumentException("revision must be positive");
+        }
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(groupId, "groupId");
         Objects.requireNonNull(splitMethod, "splitMethod");
@@ -71,7 +82,7 @@ public final class Expense {
         List<PayerContribution> payerSnapshot = validatePayers(payers, totalMinorUnits);
         List<ParticipantShare> shareSnapshot = validateShares(shares, totalMinorUnits);
         return new Expense(id, groupId, trimmedDescription, totalMinorUnits, currency, splitMethod,
-                payerSnapshot, shareSnapshot, occurredAt, 1,
+                payerSnapshot, shareSnapshot, occurredAt, revision,
                 AllocationAlgorithmVersion.EXPENSE_ALLOCATION_V1);
     }
 

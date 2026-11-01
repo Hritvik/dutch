@@ -1,0 +1,27 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "Direct expense"
+- assertVisible: "Outside any group."
+- tapOn:
+    id: "direct-description"
+- inputText: "Dinner"
+- tapOn:
+    id: "direct-amount"
+- inputText: "100"
+- hideKeyboard
+- tapOn: "mem_mem…4567"
+- tapOn: "Create direct expense"
+- extendedWaitUntil:
+    visible: "Direct expense"
+    timeout: 10000
+- assertVisible: "Dinner"
+- assertVisible: ".*50.00 INR.*"
+- assertVisible: ".*direct:mem_.*:.*INR.*"
+- takeScreenshot: android-direct-expense

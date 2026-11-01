@@ -33,6 +33,9 @@ let settlements = new Map();
 let activity = [];
 let settlementIdempotency = new Map();
 let staleInjected = new Set();
+let directExpensesByKey = new Map();
+let directExpensesById = new Map();
+let directActivity = [];
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -146,6 +149,9 @@ const server = createServer(async (request, response) => {
     activity = [];
     settlementIdempotency = new Map();
     staleInjected = new Set();
+    directExpensesByKey = new Map();
+    directExpensesById = new Map();
+    directActivity = [];
     response.writeHead(204).end();
     return;
   }
@@ -178,6 +184,68 @@ const server = createServer(async (request, response) => {
   }
   const url = new URL(request.url, 'http://localhost');
   const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'direct-expenses') {
+    if (request.method === 'POST' && parts.length === 3) {
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (idempotencyKey && directExpensesByKey.has(idempotencyKey)) {
+        json(response, 200, { data: directExpensesByKey.get(idempotencyKey) });
+        return;
+      }
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      const expenseId = `exp_${randomUUID().replaceAll('-', '')}`;
+      const base = buildExpense({ id: 'direct' }, payload, expenseId, 1);
+      const streamIds = [...new Set(base.entries.map((entry) => {
+        const [first, second] = [entry.debtor, entry.creditor].sort();
+        return `direct:${first}:${second}:${payload.currency}`;
+      }))];
+      const direct = {
+        id: expenseId,
+        description: payload.description,
+        totalMinorUnits: Number(payload.totalMinorUnits),
+        currency: payload.currency,
+        splitMethod: payload.splitMethod,
+        payers: base.payers,
+        shares: base.shares,
+        entries: base.entries,
+        streamIds,
+        occurredAt: payload.occurredAt,
+        revision: 1
+      };
+      directExpensesById.set(expenseId, direct);
+      if (idempotencyKey) directExpensesByKey.set(idempotencyKey, direct);
+      directActivity.push({
+        activityId: `act_${randomUUID().replaceAll('-', '')}`,
+        scopeId: `direct-expense:${expenseId}`,
+        actor: memberFor(subjectFrom(request)),
+        action: 'EXPENSE_CREATED',
+        targetId: expenseId,
+        targetRevision: 1,
+        occurredAt: new Date().toISOString(),
+        details: {
+          description: payload.description,
+          totalMinorUnits: String(payload.totalMinorUnits),
+          currency: payload.currency
+        }
+      });
+      json(response, 200, { data: direct });
+      return;
+    }
+    if (request.method === 'GET' && parts.length === 4) {
+      const direct = directExpensesById.get(parts[3]);
+      if (!direct) {
+        json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+        return;
+      }
+      json(response, 200, { data: direct });
+      return;
+    }
+    if (request.method === 'GET' && parts[4] === 'activity' && parts.length === 5) {
+      json(response, 200, {
+        data: directActivity.filter((entry) => entry.targetId === parts[3])
+      });
+      return;
+    }
+  }
   if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'groups' && parts[3]) {
     const group = groups.find((entry) => entry.id === parts[3]);
     if (!group) {

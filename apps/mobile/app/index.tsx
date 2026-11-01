@@ -249,6 +249,7 @@ export default function HomeScreen() {
           memberId={session.memberId}
           ledgerAvailable={session.ledgerAvailable}
           onOpenGroups={() => router.push('/groups')}
+          onOpenDirect={() => router.push('/direct/new')}
           onSignOut={signOut}
         />
       ) : null}
@@ -393,11 +394,13 @@ function Home({
   memberId,
   ledgerAvailable,
   onOpenGroups,
+  onOpenDirect,
   onSignOut
 }: {
   memberId: string;
   ledgerAvailable: boolean;
   onOpenGroups: () => void;
+  onOpenDirect: () => void;
   onSignOut: () => void;
 }) {
   return (
@@ -419,8 +422,11 @@ function Home({
       <Pressable accessibilityRole="button" onPress={onOpenGroups} style={styles.primary}>
         <Text style={styles.primaryLabel}>View groups</Text>
       </Pressable>
+      <Pressable accessibilityRole="button" onPress={onOpenDirect} style={styles.quiet}>
+        <Text style={styles.quietLabel}>Direct expense</Text>
+      </Pressable>
       <Text style={styles.body}>
-        Groups are available now. Balances and expenses arrive in the next slice.
+        Groups and one-off Direct Expenses are available. Recurring Series arrive next.
       </Text>
     </View>
   );

@@ -198,5 +198,9 @@ export function parseMajorToMinor(value: string): number {
 }
 
 export function formatMinor(minorUnits: number, currency: string): string {
-  return `${(minorUnits / 100).toFixed(2)} ${currency}`;
+  const sign = minorUnits < 0 ? '-' : '';
+  const absolute = Math.abs(minorUnits);
+  const whole = Math.floor(absolute / 100);
+  const fraction = String(absolute % 100).padStart(2, '0');
+  return `${sign}${whole}.${fraction} ${currency}`;
 }

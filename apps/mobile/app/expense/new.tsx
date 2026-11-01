@@ -35,6 +35,7 @@ export default function NewExpenseScreen() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExpenseView | null>(null);
   const idempotencyKey = useRef<string | null>(null);
+  const occurredAt = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,9 +74,12 @@ export default function NewExpenseScreen() {
         setError('Your membership is not active in this group.');
         return;
       }
-      const key = idempotencyKey.current
-        ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      idempotencyKey.current = key;
+      let key = idempotencyKey.current;
+      if (!key) {
+        key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        idempotencyKey.current = key;
+        occurredAt.current = new Date().toISOString();
+      }
       const created = await createExpense(config.apiBaseUrl, token, groupId, key, {
         description: description.trim(),
         totalMinorUnits,
@@ -83,7 +87,7 @@ export default function NewExpenseScreen() {
         splitMethod: 'EQUAL',
         payers: [{ memberId, minorUnits: totalMinorUnits }],
         participants,
-        occurredAt: new Date().toISOString()
+        occurredAt: occurredAt.current ?? new Date().toISOString()
       });
       setResult(created);
     } catch (failure) {
@@ -151,7 +155,11 @@ export default function NewExpenseScreen() {
       <Text style={styles.label}>Description</Text>
       <TextInput
         maxLength={200}
-        onChangeText={setDescription}
+        onChangeText={(value) => {
+          setDescription(value);
+          idempotencyKey.current = null;
+          occurredAt.current = null;
+        }}
         placeholder="Dinner"
         placeholderTextColor={MUTED}
         style={styles.input}
@@ -162,7 +170,11 @@ export default function NewExpenseScreen() {
       <Text style={styles.label}>Amount ({group?.currency ?? 'INR'})</Text>
       <TextInput
         keyboardType="decimal-pad"
-        onChangeText={setAmount}
+        onChangeText={(value) => {
+          setAmount(value);
+          idempotencyKey.current = null;
+          occurredAt.current = null;
+        }}
         placeholder="0.00"
         placeholderTextColor={MUTED}
         style={styles.input}

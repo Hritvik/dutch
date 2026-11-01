@@ -37,7 +37,7 @@ class ProfileStateControllerTest {
 
     @Test
     void anInvalidCorrelationIsRegeneratedInThePinnedShape() throws Exception {
-        mvc.perform(get("/api/v1/me/profile-state").header("X-Correlation-Id", "not-a-correlation")
+        mvc.perform(get("/api/v1/me/profile-state").header("X-Correlation-Id", "-invalid-correlation")
                         .with(jwt().jwt(j -> j.subject(SUBJECT))))
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Correlation-Id", org.hamcrest.Matchers.matchesPattern("^cor_[A-Za-z0-9]{16,124}$")));
@@ -66,21 +66,41 @@ class ProfileStateControllerTest {
                 .andExpect(jsonPath("$.data.displayName").value("Ada"))
                 .andExpect(jsonPath("$.data.profileState").value("PROFILE_READY"))
                 .andExpect(jsonPath("$.data.lifecycleState").value("ACTIVE"))
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.aMapWithSize(4)))
                 .andExpect(jsonPath("$.data.identityId").doesNotExist())
                 .andExpect(jsonPath("$.data.appSubject").doesNotExist());
     }
 
     @Test
-    void anInvalidAuthenticatedIdentityUsesThePinnedInvalidRequestEnvelope() throws Exception {
+    void aCorruptProfileRowIsAnInternalErrorNotAClientError() throws Exception {
         when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT))
-                .thenThrow(new IllegalArgumentException("bad subject"));
+                .thenThrow(new IllegalArgumentException("bad row"));
 
         mvc.perform(get("/api/v1/me").header("X-Correlation-Id", "cor_0123456789012345")
                         .with(jwt().jwt(j -> j.subject(SUBJECT))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("invalid_request"))
-                .andExpect(jsonPath("$.error.message").value("Request is invalid"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error.code").value("internal_error"))
+                .andExpect(jsonPath("$.error.message").value("Request could not be completed"))
                 .andExpect(jsonPath("$.error.correlationId").value("cor_0123456789012345"));
+    }
+
+    @Test
+    void aContractConformingCorrelationIsEchoedEvenWithoutTheCorPrefix() throws Exception {
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/me").header("X-Correlation-Id", "trace.abc-123:4")
+                        .with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(header().string("X-Correlation-Id", "trace.abc-123:4"));
+    }
+
+    @Test
+    void anOverlongOrControlCorrelationIsRegenerated() throws Exception {
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/me").header("X-Correlation-Id", "a".repeat(129))
+                        .with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(header().string("X-Correlation-Id",
+                        org.hamcrest.Matchers.matchesPattern("^cor_[A-Za-z0-9]{16,124}$")));
     }
 
     @Test
@@ -102,7 +122,8 @@ class ProfileStateControllerTest {
         when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.of(provisioning));
         mvc.perform(get("/api/v1/me/profile-state").with(jwt().jwt(j -> j.subject(SUBJECT))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.state").value("PROFILE_PROVISIONING"));
+                .andExpect(jsonPath("$.data.state").value("PROFILE_PROVISIONING"))
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.aMapWithSize(1)));
 
         var ready = new MemberProfile("mem_312345678901234567", "dutch-development", SUBJECT, "Ada",
                 ProfileState.PROFILE_READY, MemberLifecycleState.ACTIVE, 1,
@@ -121,14 +142,31 @@ class ProfileStateControllerTest {
     }
 
     @Test
-    void aSuspendedProfileIsNotReportedAsReady() throws Exception {
-        var profile = new MemberProfile("mem_112345678901234567", "dutch-development", SUBJECT, null,
-                ProfileState.PROFILE_REQUIRED, MemberLifecycleState.SUSPENDED, 1,
+    void aReadyButSuspendedProfileIsNotReportedAsReady() throws Exception {
+        var profile = new MemberProfile("mem_112345678901234567", "dutch-development", SUBJECT, "Ada",
+                ProfileState.PROFILE_READY, MemberLifecycleState.SUSPENDED, 1,
+                Instant.parse("2026-10-31T00:00:00Z"));
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.of(profile));
+
+        mvc.perform(get("/api/v1/me").header("X-Correlation-Id", "cor_0123456789012345")
+                        .with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("profile_required"))
+                .andExpect(jsonPath("$.error.message").value("Complete your profile to continue."))
+                .andExpect(jsonPath("$.error.correlationId").value("cor_0123456789012345"));
+        mvc.perform(get("/api/v1/me/profile-state").with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("PROFILE_REQUIRED"));
+    }
+
+    @Test
+    void aReadyProfileWithoutADisplayNameIsNotReady() throws Exception {
+        var profile = new MemberProfile("mem_412345678901234567", "dutch-development", SUBJECT, " ",
+                ProfileState.PROFILE_READY, MemberLifecycleState.ACTIVE, 1,
                 Instant.parse("2026-10-31T00:00:00Z"));
         when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.of(profile));
 
         mvc.perform(get("/api/v1/me").with(jwt().jwt(j -> j.subject(SUBJECT))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("profile_required"));
+                .andExpect(status().isConflict());
     }
 }

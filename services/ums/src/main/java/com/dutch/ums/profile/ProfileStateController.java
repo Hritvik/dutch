@@ -22,20 +22,34 @@ public final class ProfileStateController {
     @GetMapping("/me/profile-state")
     ResponseEntity<Map<String, Object>> getProfileState(Authentication authentication) {
         String appSubject = authentication.getName();
-        var profile = profiles.findByAppSubject(APP, appSubject);
-        var state = profile.map(MemberProfile::profileState).orElse(ProfileState.PROFILE_REQUIRED);
+        var state = visibleState(profiles.findByAppSubject(APP, appSubject));
         var data = new LinkedHashMap<String, Object>();
         data.put("state", state.name());
         return ResponseEntity.ok(Map.of("data", data));
     }
 
+    /** Readiness is only visible while the Member lifecycle is active; otherwise the profile is required. */
+    private ProfileState visibleState(java.util.Optional<MemberProfile> profile) {
+        if (profile.isEmpty() || profile.orElseThrow().lifecycleState() != MemberLifecycleState.ACTIVE) {
+            return ProfileState.PROFILE_REQUIRED;
+        }
+        return profile.orElseThrow().profileState();
+    }
+
+    private static String correlationId(HttpServletRequest request) {
+        Object value = request.getAttribute(CorrelationIdFilter.ATTRIBUTE);
+        return value == null ? "" : value.toString();
+    }
+
     @GetMapping("/me")
     ResponseEntity<Map<String, Object>> getProfile(Authentication authentication, HttpServletRequest request) {
-        String correlationId = (String) request.getAttribute(CorrelationIdFilter.ATTRIBUTE);
+        String correlationId = correlationId(request);
         String appSubject = authentication.getName();
         var profile = profiles.findByAppSubject(APP, appSubject);
         if (profile.isEmpty() || profile.orElseThrow().profileState() != ProfileState.PROFILE_READY
-                || profile.orElseThrow().lifecycleState() != MemberLifecycleState.ACTIVE) {
+                || profile.orElseThrow().lifecycleState() != MemberLifecycleState.ACTIVE
+                || profile.orElseThrow().displayName() == null
+                || profile.orElseThrow().displayName().isBlank()) {
             return ResponseEntity.status(409).body(Map.of(
                     "error", Map.of("code", "profile_required", "message", "Complete your profile to continue.",
                             "correlationId", correlationId)));

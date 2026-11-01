@@ -12,9 +12,9 @@ final class ProfileErrorHandler {
     ResponseEntity<Map<String, Object>> invalidRequest(
             IllegalArgumentException ignored, HttpServletRequest request) {
         String correlationId = (String) request.getAttribute(CorrelationIdFilter.ATTRIBUTE);
-        return ResponseEntity.badRequest().body(Map.of("error", Map.of(
-                "code", "invalid_request",
-                "message", "Request is invalid",
+        return ResponseEntity.internalServerError().body(Map.of("error", Map.of(
+                "code", "internal_error",
+                "message", "Request could not be completed",
                 "correlationId", correlationId)));
     }
 }

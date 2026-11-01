@@ -17,7 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public final class CorrelationIdFilter extends OncePerRequestFilter {
     public static final String HEADER = "X-Correlation-Id";
     public static final String ATTRIBUTE = CorrelationIdFilter.class.getName();
-    private static final Pattern PINNED = Pattern.compile("^cor_[A-Za-z0-9]{16,124}$");
+    private static final Pattern PINNED = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)

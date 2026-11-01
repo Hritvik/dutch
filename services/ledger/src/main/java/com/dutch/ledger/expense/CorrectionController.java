@@ -33,7 +33,7 @@ public class CorrectionController {
                 jwt.getSubject(), groupId, expenseId, idempotencyKey, parseIfMatch(ifMatch), request)));
     }
 
-    static long parseIfMatch(String value) {
+    public static long parseIfMatch(String value) {
         String normalized = value.trim();
         if (normalized.length() >= 2 && normalized.startsWith("\"") && normalized.endsWith("\"")) {
             normalized = normalized.substring(1, normalized.length() - 1);

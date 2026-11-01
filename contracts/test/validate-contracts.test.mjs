@@ -129,6 +129,21 @@ test('requires bearer JWT authentication on every group route', async () => {
   }
 });
 
+test('publishes the Direct Expense and Series command surface', async () => {
+  const openApi = parse(await readFile(
+    path.join(contractsRoot, 'http/ledger/openapi.yaml'), 'utf8'));
+  assert.deepEqual(openApi.paths['/api/v1/direct-expenses'].post.security, [{ bearerAuth: [] }]);
+  assert.deepEqual(openApi.paths['/api/v1/series'].post.security, [{ bearerAuth: [] }]);
+  assert.equal(
+    openApi.paths['/api/v1/series/occurrences/{occurrenceId}/submit'].post.responses['200']
+      .content['application/json'].schema.$ref,
+    '#/components/schemas/SeriesSubmitResponse');
+  assert.equal(
+    openApi.paths['/api/v1/direct-expenses'].post.responses['200']
+      .content['application/json'].schema.$ref,
+    '#/components/schemas/DirectExpenseResponse');
+});
+
 test('requires the split-specific input in the expense contract', async () => {
   const fixture = JSON.parse(await readFile(
     path.join(contractsRoot, 'http/fixtures/ledger/create-expense-exact.json'), 'utf8'));

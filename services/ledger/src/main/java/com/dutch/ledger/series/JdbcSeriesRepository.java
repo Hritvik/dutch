@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Series template, lifecycle, and occurrence persistence. */
 @Repository
-public class JdbcSeriesRepository {
+public class JdbcSeriesRepository implements SeriesRepository {
 
     private final JdbcTemplate jdbc;
 
@@ -26,6 +26,7 @@ public class JdbcSeriesRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     @Transactional
     public void saveNew(RecurringSeries series) {
         jdbc.update("""
@@ -57,6 +58,7 @@ public class JdbcSeriesRepository {
     }
 
     /** Advances status/next period; a template edit is a later command. */
+    @Override
     @Transactional
     public void update(RecurringSeries series, long expectedVersion) {
         int updated = jdbc.update("""
@@ -70,6 +72,7 @@ public class JdbcSeriesRepository {
         }
     }
 
+    @Override
     public Optional<RecurringSeries> find(SeriesId id) {
         List<SeriesRow> rows = jdbc.query("""
                 SELECT scope_type, group_id, currency, description, total_minor_units,
@@ -120,11 +123,32 @@ public class JdbcSeriesRepository {
                 row.createdAt()));
     }
 
+    @Override
     public List<RecurringSeries> findForGroup(GroupId groupId) {
         return findIds("SELECT series_id FROM expense_series WHERE scope_type = 'GROUP' "
                 + "AND group_id = ? ORDER BY created_at", groupId.value());
     }
 
+    @Override
+    public List<RecurringSeries> findForDirectMember(MemberId memberId) {
+        return findIds("""
+                SELECT s.series_id FROM expense_series s
+                JOIN series_participant p ON p.series_id = s.series_id
+                WHERE s.scope_type = 'DIRECT' AND p.member_id = ?
+                ORDER BY s.created_at
+                """, memberId.value());
+    }
+
+    @Override
+    public List<PendingOccurrence> occurrencesFor(SeriesId seriesId) {
+        return jdbc.query("""
+                SELECT occurrence_id, series_id, template_version, period_start, period_end,
+                    due_at, status, expense_id
+                FROM series_occurrence WHERE series_id = ? ORDER BY period_start
+                """, (result, index) -> occurrence(result), seriesId.value());
+    }
+
+    @Override
     @Transactional
     public void insertOccurrence(PendingOccurrence occurrence) {
         jdbc.update("""
@@ -138,6 +162,7 @@ public class JdbcSeriesRepository {
                 occurrence.expenseId() == null ? null : occurrence.expenseId().value());
     }
 
+    @Override
     @Transactional
     public void updateOccurrence(PendingOccurrence occurrence) {
         int updated = jdbc.update("""
@@ -151,6 +176,7 @@ public class JdbcSeriesRepository {
         }
     }
 
+    @Override
     public Optional<PendingOccurrence> findOccurrence(OccurrenceId id) {
         List<PendingOccurrence> found = jdbc.query("""
                 SELECT occurrence_id, series_id, template_version, period_start, period_end,
@@ -160,6 +186,7 @@ public class JdbcSeriesRepository {
         return found.stream().findFirst();
     }
 
+    @Override
     public Optional<PendingOccurrence> findOccurrence(SeriesId seriesId, LocalDate periodStart) {
         List<PendingOccurrence> found = jdbc.query("""
                 SELECT occurrence_id, series_id, template_version, period_start, period_end,

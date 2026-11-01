@@ -14,6 +14,11 @@ import com.dutch.ledger.direct.DirectExpense;
 import com.dutch.ledger.direct.DirectExpenseRepository;
 import com.dutch.ledger.direct.DirectScope;
 import com.dutch.ledger.expense.ObligationEntry;
+import com.dutch.ledger.series.OccurrenceId;
+import com.dutch.ledger.series.PendingOccurrence;
+import com.dutch.ledger.series.RecurringSeries;
+import com.dutch.ledger.series.SeriesId;
+import com.dutch.ledger.series.SeriesRepository;
 import com.dutch.ledger.settlement.Settlement;
 import com.dutch.ledger.settlement.SettlementId;
 import com.dutch.ledger.settlement.SettlementRepository;
@@ -115,6 +120,12 @@ public class TestGroupConfiguration {
     }
 
     @Bean
+    @Primary
+    SeriesRepository seriesRepository() {
+        return new InMemorySeriesRepository();
+    }
+
+    @Bean
     PlatformTransactionManager transactionManager() {
         return new NoOpTransactionManager();
     }
@@ -191,6 +202,87 @@ public class TestGroupConfiguration {
         @Override
         public java.util.List<ActivityEntry> forScope(String scopeId) {
             return entries.stream().filter(entry -> entry.scopeId().equals(scopeId)).toList();
+        }
+    }
+
+    static final class InMemorySeriesRepository implements SeriesRepository {
+        private final Map<SeriesId, RecurringSeries> saved = new ConcurrentHashMap<>();
+        private final Map<OccurrenceId, PendingOccurrence> occurrences = new ConcurrentHashMap<>();
+
+        @Override
+        public void saveNew(RecurringSeries series) {
+            saved.put(series.id(), series);
+        }
+
+        @Override
+        public void update(RecurringSeries series, long expectedVersion) {
+            RecurringSeries stored = saved.get(series.id());
+            if (stored == null || stored.version() != expectedVersion) {
+                throw new ConcurrentGroupUpdateException();
+            }
+            saved.put(series.id(), series);
+        }
+
+        @Override
+        public Optional<RecurringSeries> find(SeriesId id) {
+            return Optional.ofNullable(saved.get(id));
+        }
+
+        @Override
+        public List<RecurringSeries> findForGroup(GroupId groupId) {
+            return saved.values().stream()
+                    .filter(series -> series.scope().type() == com.dutch.ledger.series.SeriesScope.ScopeType.GROUP
+                            && series.scope().groupId().equals(groupId))
+                    .toList();
+        }
+
+        @Override
+        public List<RecurringSeries> findForDirectMember(MemberId memberId) {
+            return saved.values().stream()
+                    .filter(series -> series.scope().type() == com.dutch.ledger.series.SeriesScope.ScopeType.DIRECT
+                            && series.scope().memberIds().contains(memberId))
+                    .toList();
+        }
+
+        @Override
+        public void insertOccurrence(PendingOccurrence occurrence) {
+            boolean exists = occurrences.values().stream().anyMatch(candidate ->
+                    candidate.seriesId().equals(occurrence.seriesId())
+                            && candidate.periodStart().equals(occurrence.periodStart()));
+            if (exists) {
+                throw new org.springframework.dao.DuplicateKeyException("occurrence period exists");
+            }
+            occurrences.put(occurrence.id(), occurrence);
+        }
+
+        @Override
+        public void updateOccurrence(PendingOccurrence occurrence) {
+            PendingOccurrence stored = occurrences.get(occurrence.id());
+            if (stored == null || stored.status() != com.dutch.ledger.series.OccurrenceStatus.PENDING) {
+                throw new ConcurrentGroupUpdateException();
+            }
+            occurrences.put(occurrence.id(), occurrence);
+        }
+
+        @Override
+        public Optional<PendingOccurrence> findOccurrence(OccurrenceId id) {
+            return Optional.ofNullable(occurrences.get(id));
+        }
+
+        @Override
+        public Optional<PendingOccurrence> findOccurrence(SeriesId seriesId, java.time.LocalDate periodStart) {
+            return occurrences.values().stream()
+                    .filter(candidate -> candidate.seriesId().equals(seriesId)
+                            && candidate.periodStart().equals(periodStart))
+                    .findFirst();
+        }
+
+        @Override
+        public List<PendingOccurrence> occurrencesFor(SeriesId seriesId) {
+            return occurrences.values().stream()
+                    .filter(candidate -> candidate.seriesId().equals(seriesId))
+                    .sorted(java.util.Comparator.comparing(PendingOccurrence::periodStart))
+                    .toList();
         }
     }
 

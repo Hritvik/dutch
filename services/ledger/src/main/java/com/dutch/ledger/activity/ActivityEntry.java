@@ -28,7 +28,7 @@ public record ActivityEntry(
     private static final Pattern PHONE = Pattern.compile("\\+[1-9]\\d{6,14}");
     private static final Set<String> ALLOWED_DETAILS = Set.of(
             "description", "totalMinorUnits", "currency", "fromRevision", "toRevision",
-            "status", "role");
+            "status", "role", "periodStart", "periodEnd", "cadence", "scopeType");
 
     /** Returns null when free text would leak a contact identifier. */
     public static String contactFree(String value) {

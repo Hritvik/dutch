@@ -76,6 +76,12 @@ export default function GroupDetailScreen() {
         setError('The group changed. Refreshed the latest state.');
       } else if (failure instanceof GroupHttpError && failure.code === 'last_admin') {
         setError('A group must keep at least one active Admin.');
+      } else if (failure instanceof GroupHttpError && failure.code === 'forbidden') {
+        setError('You do not have permission for that action.');
+      } else if (failure instanceof GroupHttpError && failure.code === 'not_found') {
+        setError('That group or member is no longer available.');
+      } else if (failure instanceof GroupHttpError && failure.code === 'conflict') {
+        setError('The group state does not allow that action.');
       } else {
         setError('The action failed. Try again.');
       }

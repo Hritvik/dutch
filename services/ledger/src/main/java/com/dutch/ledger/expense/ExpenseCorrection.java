@@ -17,7 +17,7 @@ public record ExpenseCorrection(
         long fromRevision,
         long toRevision,
         List<ObligationEntry> reversalEntries,
-        List<ObligationEntry> replacementEntries,
+        Expense replacement,
         MemberId actor,
         Instant occurredAt) {
 
@@ -29,8 +29,11 @@ public record ExpenseCorrection(
         if (toRevision != fromRevision + 1) {
             throw new IllegalArgumentException("a correction must advance exactly one revision");
         }
+        Objects.requireNonNull(replacement, "replacement");
+        if (replacement.revision() != toRevision) {
+            throw new IllegalArgumentException("the replacement revision does not match toRevision");
+        }
         reversalEntries = List.copyOf(reversalEntries);
-        replacementEntries = List.copyOf(replacementEntries);
     }
 
     public static ExpenseCorrection of(Expense original, Expense replacement, MemberId actor,
@@ -56,12 +59,16 @@ public record ExpenseCorrection(
                     entry.minorUnits(), entry.currency(), entry.algorithmVersion()));
         }
         return new ExpenseCorrection(original.id(), original.groupId(), original.revision(),
-                replacement.revision(), reversals, replacement.obligationEntries(), actor, occurredAt);
+                replacement.revision(), reversals, replacement, actor, occurredAt);
+    }
+
+    public List<ObligationEntry> replacementEntries() {
+        return replacement.obligationEntries();
     }
 
     public List<ObligationEntry> allEntries() {
         List<ObligationEntry> entries = new ArrayList<>(reversalEntries);
-        entries.addAll(replacementEntries);
+        entries.addAll(replacementEntries());
         return List.copyOf(entries);
     }
 }

@@ -84,7 +84,11 @@ export default function GroupsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/group/${item.id}`)}
+            style={styles.card}
+          >
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>{item.name}</Text>
               <Text style={styles.badge}>{item.state}</Text>
@@ -93,7 +97,7 @@ export default function GroupsScreen() {
               {item.currency} · {item.memberships.length} member
               {item.memberships.length === 1 ? '' : 's'}
             </Text>
-          </View>
+          </Pressable>
         )}
       />
     </View>

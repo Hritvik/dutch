@@ -73,6 +73,65 @@ const server = createServer(async (request, response) => {
     json(response, 200, { data: group });
     return;
   }
+  const url = new URL(request.url, 'http://localhost');
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'groups' && parts[3]) {
+    const group = groups.find((entry) => entry.id === parts[3]);
+    if (!group) {
+      json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+      return;
+    }
+    const membershipId = parts[5];
+    const membership = membershipId
+      ? group.memberships.find((entry) => entry.memberId === membershipId)
+      : null;
+    if (request.method === 'GET' && parts.length === 4) {
+      json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'members' && parts.length === 5) {
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      group.memberships.push({
+        memberId: String(payload.memberId),
+        role: payload.role === 'ADMIN' ? 'ADMIN' : 'MEMBER',
+        state: payload.placeholder ? 'PLACEHOLDER' : 'INVITED'
+      });
+      group.version += 1;
+      json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'members' && parts[6] === 'activate' && membership) {
+      membership.state = 'ACTIVE';
+      group.version += 1;
+      json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'DELETE' && parts[4] === 'members' && membership) {
+      membership.state = 'INACTIVE';
+      group.version += 1;
+      json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'PATCH' && parts[4] === 'members' && membership) {
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      membership.role = payload.role === 'ADMIN' ? 'ADMIN' : 'MEMBER';
+      group.version += 1;
+      json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'archive') {
+      group.state = 'ARCHIVED';
+      group.version += 1;
+      json(response, 200, { data: group });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'reopen') {
+      group.state = 'ACTIVE';
+      group.version += 1;
+      json(response, 200, { data: group });
+      return;
+    }
+  }
   if (request.method === 'GET' && request.url === '/api/v1/me') {
     if (profileStateReads > REQUIRED_READS) {
       json(response, 200, {

@@ -118,3 +118,136 @@ export async function createGroup(
   }
   return parseGroupView(payload.data);
 }
+
+export class GroupHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'GroupHttpError';
+  }
+}
+
+async function send(
+  baseUrl: string,
+  accessToken: string,
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  path: string,
+  fetchImpl: ApiFetch,
+  body?: unknown,
+  expectedVersion?: number
+): Promise<GroupView> {
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    authorization: `Bearer ${accessToken}`
+  };
+  if (body !== undefined) {
+    headers['content-type'] = 'application/json';
+  }
+  if (expectedVersion !== undefined) {
+    headers['if-match'] = `"${expectedVersion}"`;
+  }
+  const response = await fetchImpl(apiUrl(baseUrl, path), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (!response.ok) {
+    throw new GroupHttpError(response.status, `Group request failed with ${response.status}.`);
+  }
+  const payload = await response.json();
+  if (!isRecord(payload)) {
+    throw new GroupContractError('Group response is missing data.');
+  }
+  return parseGroupView(payload.data);
+}
+
+export async function fetchGroup(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  const response = await fetchImpl(apiUrl(baseUrl, `/api/v1/groups/${groupId}`), {
+    method: 'GET',
+    headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` }
+  });
+  if (!response.ok) {
+    throw new GroupHttpError(response.status, `Group request failed with ${response.status}.`);
+  }
+  const payload = await response.json();
+  if (!isRecord(payload)) {
+    throw new GroupContractError('Group response is missing data.');
+  }
+  return parseGroupView(payload.data);
+}
+
+export function inviteMember(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  memberId: string,
+  role: GroupRole,
+  expectedVersion: number,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  return send(baseUrl, accessToken, 'POST', `/api/v1/groups/${groupId}/members`, fetchImpl,
+    { memberId, role, placeholder: false }, expectedVersion);
+}
+
+export function activateMember(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  memberId: string,
+  expectedVersion: number,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  return send(baseUrl, accessToken, 'POST',
+    `/api/v1/groups/${groupId}/members/${memberId}/activate`, fetchImpl, undefined, expectedVersion);
+}
+
+export function deactivateMember(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  memberId: string,
+  expectedVersion: number,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  return send(baseUrl, accessToken, 'DELETE',
+    `/api/v1/groups/${groupId}/members/${memberId}`, fetchImpl, undefined, expectedVersion);
+}
+
+export function changeRole(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  memberId: string,
+  role: GroupRole,
+  expectedVersion: number,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  return send(baseUrl, accessToken, 'PATCH',
+    `/api/v1/groups/${groupId}/members/${memberId}`, fetchImpl, { role }, expectedVersion);
+}
+
+export function archiveGroup(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  expectedVersion: number,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  return send(baseUrl, accessToken, 'POST', `/api/v1/groups/${groupId}/archive`, fetchImpl,
+    undefined, expectedVersion);
+}
+
+export function reopenGroup(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  expectedVersion: number,
+  fetchImpl: ApiFetch = fetch
+): Promise<GroupView> {
+  return send(baseUrl, accessToken, 'POST', `/api/v1/groups/${groupId}/reopen`, fetchImpl,
+    undefined, expectedVersion);
+}

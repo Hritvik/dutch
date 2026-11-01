@@ -3,8 +3,12 @@ import test from 'node:test';
 
 import {
   GroupContractError,
+  GroupHttpError,
+  archiveGroup,
   createGroup,
+  fetchGroup,
   fetchGroups,
+  inviteMember,
   parseGroupList,
   parseGroupView
 } from './groups-client';
@@ -68,5 +72,33 @@ test('rejects a failed group request', async () => {
   await assert.rejects(
     fetchGroups('https://api.example.test', 'token', async () => new Response('', { status: 403 })),
     GroupContractError
+  );
+});
+
+test('fetches one group and sends the version precondition on mutation', async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fake = async (url: string, init?: RequestInit) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ data: group }), { status: 200 });
+  };
+
+  const loaded = await fetchGroup('https://api.example.test', 'token', group.id, fake);
+  assert.equal(loaded.id, group.id);
+  assert.equal(calls[0]?.url, `https://api.example.test/api/v1/groups/${group.id}`);
+
+  await inviteMember('https://api.example.test', 'token', group.id, 'mem_212345678901234567',
+    'MEMBER', 1, fake);
+  assert.equal(calls[1]?.init?.method, 'POST');
+  assert.equal(new Headers(calls[1]?.init?.headers).get('if-match'), '"1"');
+
+  await archiveGroup('https://api.example.test', 'token', group.id, 2, fake);
+  assert.equal(new Headers(calls[2]?.init?.headers).get('if-match'), '"2"');
+});
+
+test('surfaces a stale-version conflict as an HTTP error', async () => {
+  await assert.rejects(
+    archiveGroup('https://api.example.test', 'token', group.id, 9,
+      async () => new Response('', { status: 409 })),
+    (error: unknown) => error instanceof GroupHttpError && error.status === 409
   );
 });

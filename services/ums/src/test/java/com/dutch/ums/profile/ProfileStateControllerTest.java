@@ -160,6 +160,20 @@ class ProfileStateControllerTest {
     }
 
     @Test
+    void aReadyProfileWithANullDisplayNameIsNotReady() throws Exception {
+        var profile = new MemberProfile("mem_512345678901234567", "dutch-development", SUBJECT, null,
+                ProfileState.PROFILE_READY, MemberLifecycleState.ACTIVE, 1,
+                Instant.parse("2026-10-31T00:00:00Z"));
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.of(profile));
+
+        mvc.perform(get("/api/v1/me").with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isConflict());
+        mvc.perform(get("/api/v1/me/profile-state").with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("PROFILE_REQUIRED"));
+    }
+
+    @Test
     void aReadyProfileWithoutADisplayNameIsNotReady() throws Exception {
         var profile = new MemberProfile("mem_412345678901234567", "dutch-development", SUBJECT, " ",
                 ProfileState.PROFILE_READY, MemberLifecycleState.ACTIVE, 1,

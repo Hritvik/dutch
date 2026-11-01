@@ -46,7 +46,7 @@ public final class ProfileStateController {
 
     private static String correlationId(HttpServletRequest request) {
         Object value = request.getAttribute(CorrelationIdFilter.ATTRIBUTE);
-        return value == null ? "" : value.toString();
+        return value == null ? "cor_unknown" : value.toString();
     }
 
     @GetMapping("/me")

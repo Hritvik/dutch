@@ -7,6 +7,7 @@ import static com.dutch.ledger.TestGroupConfiguration.MEMBER_SUBJECT;
 import static com.dutch.ledger.TestGroupConfiguration.OUTSIDER_SUBJECT;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -68,6 +69,35 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.data.entries[0].debtor").value(MEMBER.value()))
                 .andExpect(jsonPath("$.data.entries[0].creditor").value(ADMIN.value()))
                 .andExpect(jsonPath("$.data.entries[0].minorUnits").value(50));
+    }
+
+    @Test
+    void reads_the_latest_expense_revision_for_a_member() throws Exception {
+        String groupId = createGroup();
+        String body = mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses")
+                        .with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-read")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(expenseJson(100, "INR")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String expenseId = JsonPath.read(body, "$.data.id");
+
+        mockMvc.perform(get("/api/v1/groups/" + groupId + "/expenses/" + expenseId)
+                        .with(as(MEMBER_SUBJECT)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(expenseId))
+                .andExpect(jsonPath("$.data.revision").value(1))
+                .andExpect(jsonPath("$.data.totalMinorUnits").value(100));
+
+        mockMvc.perform(get("/api/v1/groups/" + groupId + "/expenses/" + expenseId)
+                        .with(as(OUTSIDER_SUBJECT)))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].action").value("EXPENSE_CREATED"))
+                .andExpect(jsonPath("$.data[0].details.totalMinorUnits").value("100"));
     }
 
     @Test

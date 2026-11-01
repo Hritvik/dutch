@@ -46,6 +46,7 @@ public class JdbcActivityRepository implements ActivityRepository {
                     target_revision, occurred_at, details::text AS details
                 FROM activity_entry WHERE scope_id = ?
                 ORDER BY occurred_at, activity_id
+                LIMIT 500
                 """, (result, index) -> new ActivityEntry(
                 result.getString("activity_id"),
                 result.getString("scope_id"),

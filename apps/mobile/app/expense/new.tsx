@@ -15,6 +15,7 @@ import { sessionStore } from '../../src/expo-session-store';
 import {
   ExpenseHttpError,
   createExpense,
+  fetchExpense,
   formatMinor,
   parseMajorToMinor,
   type ExpenseView
@@ -143,7 +144,8 @@ export default function NewExpenseScreen() {
 
   const confirmCorrection = useCallback(async () => {
     if (!token || !group || !memberId || !draft || !result) return;
-    if (result.payers.length !== 1) {
+    const current = result;
+    if (current.payers.length !== 1) {
       setCorrectionError('This prototype can correct a single-payer expense only.');
       return;
     }
@@ -153,9 +155,7 @@ export default function NewExpenseScreen() {
     const submitting = submitCorrection(draft, key);
     setDraft(submitting);
     try {
-      const participants = group.memberships
-        .filter((membership) => membership.state === 'ACTIVE')
-        .map((membership) => membership.memberId);
+      const participants = current.shares.map((share) => share.memberId);
       const corrected = await correctExpense(
         config.apiBaseUrl,
         token,
@@ -166,11 +166,11 @@ export default function NewExpenseScreen() {
         {
           description: draft.description,
           totalMinorUnits: draft.totalMinorUnits,
-          currency: result.currency,
+          currency: current.currency,
           splitMethod: 'EQUAL',
-          payers: [{ memberId: result.payers[0].memberId, minorUnits: draft.totalMinorUnits }],
+          payers: [{ memberId: current.payers[0].memberId, minorUnits: draft.totalMinorUnits }],
           participants,
-          occurredAt: result.occurredAt
+          occurredAt: current.occurredAt
         }
       );
       setResult(corrected);
@@ -179,10 +179,18 @@ export default function NewExpenseScreen() {
       setCorrectionError(null);
     } catch (failure) {
       if (failure instanceof ExpenseHttpError && failure.code === 'stale_version') {
-        setDraft(markCorrectionStale(submitting, result.revision));
         setCorrectionStep('edit');
-        setCorrectionError(
-          'This expense changed. Your draft is kept. Review the latest state before submitting.');
+        try {
+          const latest = await fetchExpense(config.apiBaseUrl, token, current.groupId, draft.expenseId);
+          setResult(latest);
+          setDraft(markCorrectionStale(submitting, latest.revision));
+          setCorrectionError(
+            'This expense changed. Your draft is kept. Review the latest state before submitting.');
+        } catch {
+          setDraft(markCorrectionStale(submitting, current.revision));
+          setCorrectionError(
+            'This expense changed. Your draft is kept. Reload the expense before submitting.');
+        }
       } else if (failure instanceof ExpenseHttpError && failure.code === 'idempotency_conflict') {
         setDraft(editCorrection(submitting, {}));
         setCorrectionError('This draft was already sent with different details. Review it again.');
@@ -264,8 +272,17 @@ export default function NewExpenseScreen() {
               <Text style={styles.sectionLabel}>After</Text>
               <Text style={styles.reviewValue}>
                 {formatMinor(draft.totalMinorUnits, result.currency)} · you{' '}
-                {formatMinor(projectedShare(draft, group, memberId), result.currency)}
+                {formatMinor(projectedShare(draft, result, memberId), result.currency)}
               </Text>
+              <Text style={styles.sectionLabel}>Every share</Text>
+              {draftShares(result, draft).map((share) => (
+                <Text key={share.memberId} style={styles.muted}>
+                  {shortId(share.memberId)}
+                  {share.memberId === memberId ? ' (you)' : ''}:{' '}
+                  {formatMinor(share.before, result.currency)} to{' '}
+                  {formatMinor(share.after, result.currency)}
+                </Text>
+              ))}
               <Text style={styles.muted}>
                 A correction appends a new revision and reverses the previous entries. Activity
                 records both revisions.
@@ -389,14 +406,25 @@ function shareFor(expense: ExpenseView, memberId: string | null): number {
   return expense.shares.find((share) => share.memberId === memberId)?.minorUnits ?? 0;
 }
 
-function projectedShare(draft: CorrectionDraft, group: GroupView | null,
+function projectedShare(draft: CorrectionDraft, expense: ExpenseView,
                         memberId: string | null): number {
-  if (!group || !memberId) return 0;
-  const participants = group.memberships
-    .filter((membership) => membership.state === 'ACTIVE')
-    .map((membership) => membership.memberId);
-  return equalShares(draft.totalMinorUnits, participants)
-    .find((share) => share.memberId === memberId)?.minorUnits ?? 0;
+  return draftShares(expense, draft)
+    .find((share) => share.memberId === memberId)?.after ?? 0;
+}
+
+/** The correction replaces the same participant set, so no share moves silently. */
+function draftShares(expense: ExpenseView, draft: CorrectionDraft): {
+  memberId: string;
+  before: number;
+  after: number;
+}[] {
+  const participants = expense.shares.map((share) => share.memberId);
+  const after = equalShares(draft.totalMinorUnits, participants);
+  return expense.shares.map((share) => ({
+    memberId: share.memberId,
+    before: share.minorUnits,
+    after: after.find((candidate) => candidate.memberId === share.memberId)?.minorUnits ?? 0
+  }));
 }
 
 function shortId(value: string): string {

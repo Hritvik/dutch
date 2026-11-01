@@ -58,10 +58,10 @@ class CorrectionControllerTest {
 
         mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].action").value("EXPENSE_CORRECTED"))
-                .andExpect(jsonPath("$.data[0].details.fromRevision").value("1"))
-                .andExpect(jsonPath("$.data[0].details.toRevision").value("2"))
-                .andExpect(jsonPath("$.data[0].details.totalMinorUnits").value("120"));
+                .andExpect(jsonPath("$.data[1].action").value("EXPENSE_CORRECTED"))
+                .andExpect(jsonPath("$.data[1].details.fromRevision").value("1"))
+                .andExpect(jsonPath("$.data[1].details.toRevision").value("2"))
+                .andExpect(jsonPath("$.data[1].details.totalMinorUnits").value("120"));
     }
 
     @Test
@@ -94,8 +94,9 @@ class CorrectionControllerTest {
 
         mockMvc.perform(get("/api/v1/groups/" + groupId + "/activity").with(as(ADMIN_SUBJECT)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].targetRevision").value(2));
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[1].action").value("EXPENSE_CORRECTED"))
+                .andExpect(jsonPath("$.data[1].targetRevision").value(2));
     }
 
     @Test
@@ -131,6 +132,43 @@ class CorrectionControllerTest {
                         .content(replacementJson(130)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.code").value("idempotency_conflict"));
+    }
+
+    @Test
+    void rejects_a_correction_without_its_command_headers() throws Exception {
+        String groupId = createGroup();
+        String expenseId = createExpense(groupId, 100);
+        String path = "/api/v1/groups/" + groupId + "/expenses/" + expenseId + "/corrections";
+
+        mockMvc.perform(post(path).with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(replacementJson(120)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+
+        mockMvc.perform(post(path).with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "correction-no-match")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(replacementJson(120)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
+    void a_correction_cannot_cross_the_path_group() throws Exception {
+        String ownerGroup = createGroup();
+        String expenseId = createExpense(ownerGroup, 100);
+        String otherGroup = createGroup();
+
+        mockMvc.perform(post("/api/v1/groups/" + otherGroup + "/expenses/" + expenseId + "/corrections")
+                        .with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "correction-cross-group")
+                        .header("If-Match", "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(replacementJson(120)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("not_found"));
     }
 
     @Test

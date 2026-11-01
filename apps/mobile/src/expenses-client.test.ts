@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   ExpenseContractError,
   createExpense,
+  fetchExpense,
   formatMinor,
   parseExpenseView,
   parseMajorToMinor
@@ -50,6 +51,20 @@ test('parses and formats major-unit input', () => {
   assert.throws(() => parseMajorToMinor('1.234'), ExpenseContractError);
   assert.throws(() => parseMajorToMinor('0'), ExpenseContractError);
   assert.equal(formatMinor(1250, 'INR'), '12.50 INR');
+});
+
+test('reads the latest expense revision for a member', async () => {
+  let requested: { url: string; init?: RequestInit } | undefined;
+  const read = await fetchExpense('https://api.example.test', 'token', expense.groupId,
+    expense.id, async (url, init) => {
+      requested = { url, init };
+      return new Response(JSON.stringify({ data: expense }), { status: 200 });
+    });
+  assert.equal(read.revision, 1);
+  assert.equal(requested?.url,
+    `https://api.example.test/api/v1/groups/${expense.groupId}/expenses/${expense.id}`);
+  const headers = new Headers(requested?.init?.headers);
+  assert.equal(headers.get('authorization'), 'Bearer token');
 });
 
 test('creates an expense with the idempotency key and bearer token', async () => {

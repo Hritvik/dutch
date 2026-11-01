@@ -25,7 +25,7 @@ import {
   type MembershipView
 } from '../../src/groups-client';
 import { fetchMemberProfile } from '../../src/profile-client';
-import { fetchActivity, type ActivityEntry } from '../../src/activity-client';
+import { ActivityHttpError, fetchActivity, type ActivityEntry } from '../../src/activity-client';
 import { formatMinor } from '../../src/expenses-client';
 
 const config = createAppConfig(process.env);
@@ -36,6 +36,7 @@ export default function GroupDetailScreen() {
   const [group, setGroup] = useState<GroupView | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [inviteId, setInviteId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -58,10 +59,14 @@ export default function GroupDetailScreen() {
       } catch {
         setMemberId(null);
       }
+      setActivityError(null);
       try {
         setActivity(await fetchActivity(config.apiBaseUrl, material.accessToken, id));
-      } catch {
+      } catch (failure) {
         setActivity([]);
+        setActivityError(failure instanceof ActivityHttpError
+          ? `Activity is unavailable (${failure.status}).`
+          : 'We could not load Activity.');
       }
       return true;
     } catch {
@@ -156,7 +161,9 @@ export default function GroupDetailScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Activity</Text>
-        {activity.length === 0 ? (
+        {activityError ? (
+          <Text style={styles.notice}>{activityError}</Text>
+        ) : activity.length === 0 ? (
           <Text style={styles.muted}>No activity recorded yet.</Text>
         ) : activity.slice(-6).reverse().map((entry) => (
           <View key={entry.activityId} style={styles.activityRow}>

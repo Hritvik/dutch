@@ -120,7 +120,8 @@ export default function NewSettlementScreen() {
       setResult(recorded);
       setStep('result');
     } catch (failure) {
-      idempotencyKey.current = null;
+      // Keep the key and occurredAt: an ambiguous failure must replay the same
+      // command rather than record a second settlement.
       if (failure instanceof SettlementHttpError && failure.code === 'idempotency_conflict') {
         setError('This draft was sent with a different amount. Review it again.');
       } else if (failure instanceof SettlementHttpError && failure.code === 'conflict') {

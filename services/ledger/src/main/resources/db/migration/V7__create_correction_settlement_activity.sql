@@ -190,9 +190,28 @@ DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION settlement_allocations_balance();
 
 CREATE CONSTRAINT TRIGGER settlement_allocation_requires_balance
-AFTER INSERT OR UPDATE OR DELETE ON settlement_allocation
+AFTER INSERT ON settlement_allocation
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION settlement_allocations_balance();
+
+-- The parent may only move ACTIVE -> VOIDED once; its financial fields are fixed.
+CREATE OR REPLACE FUNCTION settlement_only_voidable() RETURNS trigger AS $$
+BEGIN
+    IF NEW.settlement_id = OLD.settlement_id
+       AND NEW.payer_member_id = OLD.payer_member_id
+       AND NEW.payee_member_id = OLD.payee_member_id
+       AND NEW.total_minor_units = OLD.total_minor_units
+       AND NEW.currency = OLD.currency
+       AND NEW.occurred_at = OLD.occurred_at
+       AND OLD.status = 'ACTIVE' AND NEW.status = 'VOIDED' THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'settlement is immutable except for a one-way void';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER settlement_only_voidable BEFORE UPDATE ON settlement
+FOR EACH ROW EXECUTE FUNCTION settlement_only_voidable();
 
 CREATE TRIGGER expense_correction_immutable BEFORE UPDATE OR DELETE ON expense_correction
 FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();

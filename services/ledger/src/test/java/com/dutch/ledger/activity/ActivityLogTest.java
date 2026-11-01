@@ -70,9 +70,25 @@ class ActivityLogTest {
                 .hasMessageContaining("contact identifiers");
 
         assertThatThrownBy(() -> entry("act_300000000000000003", ActivityAction.MEMBERSHIP_CHANGED, 1,
-                Map.of("description", "+919876543210")))
+                Map.of("description", "Dinner with person@example.test")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contact identifiers");
+
+        assertThatThrownBy(() -> entry("act_300000000000000004", ActivityAction.MEMBERSHIP_CHANGED, 1,
+                Map.of("description", "Call +919876543210")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contact identifiers");
+    }
+
+    @Test
+    void a_former_member_entry_omits_the_actor_json() throws Exception {
+        ActivityEntry entry = new ActivityEntry("act_500000000000000001", SCOPE, null,
+                ActivityAction.MEMBERSHIP_CHANGED, "mem_112345678901234567", 1, NOW,
+                Map.of("role", "MEMBER"));
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .findAndRegisterModules();
+        String json = mapper.writeValueAsString(entry);
+        org.assertj.core.api.Assertions.assertThat(json).doesNotContain("\"actor\"");
     }
 
     @Test

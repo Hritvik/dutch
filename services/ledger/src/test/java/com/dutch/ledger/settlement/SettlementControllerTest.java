@@ -65,9 +65,17 @@ class SettlementControllerTest {
                 .andExpect(jsonPath("$.data[0].targetId").value(settlementId))
                 .andExpect(jsonPath("$.data[0].details.totalMinorUnits").value("100"));
 
+        String voidKey = "void-" + UUID.randomUUID();
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/settlements/" + settlementId + "/void")
                         .with(as(ADMIN_SUBJECT))
-                        .header("Idempotency-Key", "void-" + UUID.randomUUID()))
+                        .header("Idempotency-Key", voidKey))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("VOIDED"));
+
+        // The same key replays the accepted void instead of reporting a conflict.
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/settlements/" + settlementId + "/void")
+                        .with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", voidKey))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("VOIDED"));
 

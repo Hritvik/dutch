@@ -36,7 +36,7 @@ final class ExpenseErrorHandler {
     @ExceptionHandler(GroupRuleException.class)
     ResponseEntity<Map<String, Object>> rule(HttpServletRequest request) {
         return error(request, HttpStatus.CONFLICT, "conflict",
-                "The request conflicts with the current state.");
+                "The request conflicts with the current group state");
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)

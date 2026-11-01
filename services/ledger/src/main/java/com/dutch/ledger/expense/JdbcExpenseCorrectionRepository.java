@@ -61,15 +61,33 @@ public class JdbcExpenseCorrectionRepository implements CorrectionRepository {
             throw new ConcurrentGroupCorrectionException();
         }
 
+        java.util.List<Long> reversalIds = new java.util.ArrayList<>();
         for (ObligationEntry entry : correction.reversalEntries()) {
-            jdbc.update("""
+            Long reversalId = jdbc.queryForObject("""
                     INSERT INTO obligation_entry (expense_id, revision, group_id, stream_id,
                         debtor_member_id, creditor_member_id, minor_units, currency,
                         algorithm_version, entry_kind, correction_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'REVERSAL', ?)
-                    """, entry.expenseId().value(), entry.revision(), replacement.groupId().value(),
-                    streamId, entry.debtor().value(), entry.creditor().value(), entry.minorUnits(),
-                    entry.currency(), entry.algorithmVersion(), correctionId);
+                    RETURNING entry_id
+                    """, Long.class, entry.expenseId().value(), entry.revision(),
+                    replacement.groupId().value(), streamId, entry.debtor().value(),
+                    entry.creditor().value(), entry.minorUnits(), entry.currency(),
+                    entry.algorithmVersion(), correctionId);
+            reversalIds.add(reversalId);
+        }
+        java.util.List<Long> originalIds = jdbc.queryForList("""
+                SELECT entry_id FROM obligation_entry
+                WHERE expense_id = ? AND revision = ? AND entry_kind = 'CHARGE'
+                ORDER BY entry_id
+                """, Long.class, correction.expenseId().value(), correction.fromRevision());
+        if (originalIds.size() != reversalIds.size()) {
+            throw new IllegalStateException("reversals must match the original entries exactly");
+        }
+        for (int index = 0; index < reversalIds.size(); index++) {
+            jdbc.update("""
+                    INSERT INTO entry_reversal_link (reversal_entry_id, original_entry_id)
+                    VALUES (?, ?)
+                    """, reversalIds.get(index), originalIds.get(index));
         }
         for (ObligationEntry entry : correction.replacementEntries()) {
             jdbc.update("""
@@ -107,7 +125,7 @@ public class JdbcExpenseCorrectionRepository implements CorrectionRepository {
                 """, streamId, replacement.currency(), streamVersion, streamId, streamId);
     }
 
-    public static final class ConcurrentGroupCorrectionException extends RuntimeException {
+    public static final class ConcurrentGroupCorrectionException extends com.dutch.ledger.group.GroupRuleException {
         public ConcurrentGroupCorrectionException() {
             super("This expense revision has already been corrected.");
         }

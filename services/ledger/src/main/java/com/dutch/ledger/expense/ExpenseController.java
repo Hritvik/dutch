@@ -4,6 +4,7 @@ import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +20,15 @@ public class ExpenseController {
 
     public ExpenseController(ExpenseService expenses) {
         this.expenses = expenses;
+    }
+
+    @GetMapping("/{expenseId}")
+    ResponseEntity<Map<String, Object>> read(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String groupId,
+            @PathVariable String expenseId) {
+        return ResponseEntity.ok(Map.of("data",
+                expenses.read(jwt.getSubject(), groupId, expenseId)));
     }
 
     @PostMapping

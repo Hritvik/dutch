@@ -300,6 +300,27 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/groups/{groupId}/expenses/{expenseId}:
+    get:
+      operationId: getExpense
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/ExpenseId"
+      responses:
+        "200":
+          description: The latest revision of the expense and its exact entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/v1/groups/{groupId}/settlements:
     post:
       operationId: recordSettlement
@@ -900,7 +921,9 @@ components:
           maxItems: 1000
           items:
             $ref: "#/components/schemas/SettlementAllocationRequest"
-          description: Defaults to this Group's single scope for the whole total.
+          description: Omit to apply the whole total to this Group's scope. Multi-scope
+            `Settle all` is not exposed yet; when present, every scope must name exactly
+            this Group and currency, and scopes must be unique.
     SettlementAllocationView:
       type: object
       additionalProperties: false

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ActivityContractError, fetchActivity, parseActivityEntry } from './activity-client';
+import {
+  ActivityContractError,
+  ActivityHttpError,
+  fetchActivity,
+  parseActivityEntry
+} from './activity-client';
 
 const GROUP = 'grp_000000000000000001';
 const entry = {
@@ -29,6 +34,23 @@ test('rejects an unknown action and non-string details', () => {
     ActivityContractError);
   assert.throws(() => parseActivityEntry({ ...entry, details: { totalMinorUnits: 120 } }),
     ActivityContractError);
+});
+
+test('accepts a null actor from an older server and omits it', () => {
+  const parsed = parseActivityEntry({ ...entry, actor: null });
+  assert.equal(parsed.actor, undefined);
+});
+
+test('surfaces the HTTP status of a failed activity request', async () => {
+  await assert.rejects(
+    fetchActivity('https://api.example.test', 'token', GROUP,
+      async () => new Response(JSON.stringify({
+        error: { code: 'forbidden', message: 'Access is denied' }
+      }), { status: 403 })),
+    (error: unknown) => error instanceof ActivityHttpError
+      && error.status === 403
+      && error.code === 'forbidden'
+  );
 });
 
 test('fetches the group activity feed', async () => {

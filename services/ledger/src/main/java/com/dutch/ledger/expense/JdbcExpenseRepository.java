@@ -138,7 +138,9 @@ public class JdbcExpenseRepository implements ExpenseRepository {
         return jdbc.query("""
                 SELECT expense_id, revision, debtor_member_id, creditor_member_id, minor_units,
                     currency, algorithm_version
-                FROM obligation_entry WHERE stream_id = ? ORDER BY entry_id
+                FROM obligation_entry
+                WHERE stream_id = ? AND expense_id IS NOT NULL AND revision IS NOT NULL
+                ORDER BY entry_id
                 """, (result, index) -> new ObligationEntry(
                 new ExpenseId(result.getString("expense_id")),
                 result.getLong("revision"),

@@ -96,6 +96,8 @@ class JdbcExpenseCorrectionRepositoryIntegrationTest {
                 SELECT debtor_member_id FROM obligation_entry
                 WHERE expense_id = ? AND entry_kind = 'REVERSAL'
                 """, String.class, EXPENSE.value())).isEqualTo(ADMIN.value());
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM entry_reversal_link", Long.class)).isEqualTo(1);
     }
 
     private static Expense expense(long revision, long adminShare, long memberShare) {

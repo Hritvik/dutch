@@ -80,6 +80,8 @@ class JdbcSettlementRepositoryIntegrationTest {
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM obligation_entry WHERE settlement_id = ? AND entry_kind = 'SETTLEMENT'",
                 Long.class, SETTLEMENT.value())).isEqualTo(2);
+        // A stream that also carries settlement entries still reads only its Expenses.
+        assertThat(new JdbcExpenseRepository(jdbc).entriesFor(GROUP, "INR")).isEmpty();
         assertThat(new JdbcExpenseRepository(jdbc).projectionFor(GROUP, "INR").balances())
                 .containsEntry(A, 60L)
                 .containsEntry(B, -60L);
@@ -107,6 +109,26 @@ class JdbcSettlementRepositoryIntegrationTest {
         assertThatThrownBy(() -> transactions.executeWithoutResult(status ->
                 settlements.voidSettlement(SettlementVoid.of(settlement, A, NOW))))
                 .isInstanceOf(GroupRuleException.class);
+    }
+
+    @Test
+    void the_parent_total_is_immutable_except_for_a_one_way_void() {
+        SettlementId immutable = new SettlementId("stl_812345678901234567");
+        GroupId otherGroup = new GroupId("grp_812345678901234567");
+        transactions.executeWithoutResult(status -> {
+            Group group = Group.create(otherGroup, "Other flat", "INR", A, NOW);
+            group.invite(A, B, GroupRole.MEMBER, NOW);
+            group.activate(B, B, NOW);
+            new JdbcGroupRepository(jdbc).saveNew(group);
+            settlements.save(new Settlement(immutable, A, B, 100, "INR",
+                    List.of(new SettlementAllocation("group:" + otherGroup.value() + ":INR",
+                            "INR", 100, A, B)), NOW));
+        });
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> jdbc.update(
+                "UPDATE settlement SET total_minor_units = 200 WHERE settlement_id = ?",
+                immutable.value())))
+                .hasStackTraceContaining("one-way void");
     }
 
     @Test

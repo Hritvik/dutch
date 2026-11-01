@@ -159,6 +159,27 @@ async function toError(response: Response): Promise<ExpenseHttpError> {
   return new ExpenseHttpError(response.status, `Expense request failed with ${response.status}.`, code);
 }
 
+export async function fetchExpense(
+  baseUrl: string,
+  accessToken: string,
+  groupId: string,
+  expenseId: string,
+  fetchImpl: ApiFetch = fetch
+): Promise<ExpenseView> {
+  const response = await fetchImpl(
+    apiUrl(baseUrl, `/api/v1/groups/${groupId}/expenses/${expenseId}`),
+    { method: 'GET', headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` } }
+  );
+  if (!response.ok) {
+    throw await toError(response);
+  }
+  const payload = await response.json();
+  if (!isRecord(payload)) {
+    throw new ExpenseContractError('Expense response is missing data.');
+  }
+  return parseExpenseView(payload.data);
+}
+
 export async function createExpense(
   baseUrl: string,
   accessToken: string,

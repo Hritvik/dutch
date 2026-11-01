@@ -32,6 +32,7 @@ let expensesById = new Map();
 let settlements = new Map();
 let activity = [];
 let settlementIdempotency = new Map();
+let staleInjected = new Set();
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -144,6 +145,7 @@ const server = createServer(async (request, response) => {
     settlements = new Map();
     activity = [];
     settlementIdempotency = new Map();
+    staleInjected = new Set();
     response.writeHead(204).end();
     return;
   }
@@ -209,6 +211,15 @@ const server = createServer(async (request, response) => {
       json(response, 200, { data: expense });
       return;
     }
+    if (request.method === 'GET' && parts[4] === 'expenses' && parts.length === 6) {
+      const expense = expensesById.get(parts[5]);
+      if (!expense || expense.groupId !== group.id) {
+        json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+        return;
+      }
+      json(response, 200, { data: expense });
+      return;
+    }
     if (request.method === 'POST' && parts[4] === 'expenses' && parts[6] === 'corrections') {
       const expenseId = parts[5];
       const current = expensesById.get(expenseId);
@@ -217,9 +228,11 @@ const server = createServer(async (request, response) => {
         return;
       }
       const correctionPayload = JSON.parse((await readBody(request)) || '{}');
-      // Fault injection: the amount 999.00 always answers stale_version so the
-      // device flow can prove that the Local Draft survives a stale correction.
-      if (Number(correctionPayload.totalMinorUnits) === 99900) {
+      // Fault injection: the first 999.00 attempt answers stale_version so the
+      // device flow can prove that the Local Draft survives and recovers after
+      // the refresh; the retry then succeeds.
+      if (Number(correctionPayload.totalMinorUnits) === 99900 && !staleInjected.has(expenseId)) {
+        staleInjected.add(expenseId);
         json(response, 409, {
           error: { code: 'stale_version', message: 'The group changed. Refresh and retry.' }
         });

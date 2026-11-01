@@ -1,5 +1,8 @@
 package com.dutch.ledger.expense;
 
+import com.dutch.ledger.activity.ActivityAction;
+import com.dutch.ledger.activity.ActivityEntry;
+import com.dutch.ledger.activity.ActivityRepository;
 import com.dutch.ledger.group.Group;
 import com.dutch.ledger.group.GroupAccessDeniedException;
 import com.dutch.ledger.group.GroupForbiddenException;
@@ -11,6 +14,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,14 +31,17 @@ public class ExpenseService {
     private final GroupRepository groups;
     private final MemberResolver members;
     private final IdempotencyStore idempotency;
+    private final ActivityRepository activity;
     private final ObjectMapper objectMapper;
 
     public ExpenseService(ExpenseRepository expenses, GroupRepository groups, MemberResolver members,
-                          IdempotencyStore idempotency, ObjectMapper objectMapper) {
+                          IdempotencyStore idempotency, ActivityRepository activity,
+                          ObjectMapper objectMapper) {
         this.expenses = expenses;
         this.groups = groups;
         this.members = members;
         this.idempotency = idempotency;
+        this.activity = activity;
         this.objectMapper = objectMapper;
     }
 
@@ -70,9 +78,29 @@ public class ExpenseService {
 
         Expense expense = build(group, request);
         expenses.save(expense);
+        Instant now = Instant.now();
+        activity.append(new ActivityEntry("act_" + UUID.randomUUID().toString().replace("-", ""),
+                "group:" + group.id().value() + ":" + group.currency(), actor,
+                ActivityAction.EXPENSE_CREATED, expense.id().value(), expense.revision(), now,
+                Map.of("description", expense.description(),
+                        "totalMinorUnits", Long.toString(expense.totalMinorUnits()),
+                        "currency", expense.currency())));
         ExpenseView view = ExpenseView.from(expense);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;
+    }
+
+    @Transactional(readOnly = true)
+    public ExpenseView read(String appSubject, String groupId, String expenseId) {
+        MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
+        Group group = groups.findById(new GroupId(groupId)).orElseThrow(GroupAccessDeniedException::new);
+        if (!group.canRead(actor)) {
+            throw new GroupAccessDeniedException();
+        }
+        Expense expense = expenses.findExpense(new ExpenseId(expenseId))
+                .filter(found -> found.groupId().equals(group.id()))
+                .orElseThrow(GroupAccessDeniedException::new);
+        return ExpenseView.from(expense);
     }
 
     private ExpenseView replay(IdempotencyStore.Outcome outcome, String requestHash, String groupId) {

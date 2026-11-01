@@ -37,3 +37,8 @@ appId: com.dutch.mobile
 - tapOn: "Review latest"
 - assertVisible: "After"
 - assertVisible: ".*999.00 INR.*"
+- tapOn: "Confirm correction"
+- extendedWaitUntil:
+    visible: "Correction recorded at version 2."
+    timeout: 10000
+- takeScreenshot: android-correction-recovered

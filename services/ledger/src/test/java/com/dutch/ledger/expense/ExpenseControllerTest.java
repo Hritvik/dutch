@@ -133,6 +133,123 @@ class ExpenseControllerTest {
     }
 
     @Test
+    void rejects_an_inactive_participant() throws Exception {
+        String groupId = createGroup();
+        mockMvc.perform(delete("/api/v1/groups/" + groupId + "/members/" + MEMBER.value())
+                        .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"2\""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-inactive")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(expenseJson(100, "INR")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
+    void rejects_an_unknown_participant() throws Exception {
+        String groupId = createGroup();
+        String body = """
+                {"description":"Dinner","totalMinorUnits":100,"currency":"INR","splitMethod":"EQUAL",
+                 "payers":[{"memberId":"%s","minorUnits":100}],
+                 "participants":["%s","mem_999999999999999999"],
+                 "occurredAt":"2026-11-01T00:00:00Z"}
+                """.formatted(ADMIN.value(), ADMIN.value());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-unknown")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
+    void allows_an_invited_participant() throws Exception {
+        String groupId = createGroupWithoutMember();
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + MEMBER.value() + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-invited")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(expenseJson(100, "INR")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.entries[0].minorUnits").value(50));
+    }
+
+    @Test
+    void rejects_exact_without_exact_shares() throws Exception {
+        String groupId = createGroup();
+        String body = """
+                {"description":"Dinner","totalMinorUnits":100,"currency":"INR","splitMethod":"EXACT",
+                 "payers":[{"memberId":"%s","minorUnits":100}],
+                 "participants":["%s","%s"],
+                 "occurredAt":"2026-11-01T00:00:00Z"}
+                """.formatted(ADMIN.value(), ADMIN.value(), MEMBER.value());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-exact-missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
+    void rejects_percentage_without_points_and_unbounded_points() throws Exception {
+        String groupId = createGroup();
+        String missing = """
+                {"description":"Dinner","totalMinorUnits":100,"currency":"INR","splitMethod":"PERCENTAGE",
+                 "payers":[{"memberId":"%s","minorUnits":100}],
+                 "participants":["%s","%s"],
+                 "occurredAt":"2026-11-01T00:00:00Z"}
+                """.formatted(ADMIN.value(), ADMIN.value(), MEMBER.value());
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-percentage-missing")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(missing))
+                .andExpect(status().isBadRequest());
+
+        String unbounded = """
+                {"description":"Dinner","totalMinorUnits":100,"currency":"INR","splitMethod":"PERCENTAGE",
+                 "payers":[{"memberId":"%s","minorUnits":100}],
+                 "participants":["%s","%s"],
+                 "percentageBasisPoints":[10001,-1],
+                 "occurredAt":"2026-11-01T00:00:00Z"}
+                """.formatted(ADMIN.value(), ADMIN.value(), MEMBER.value());
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-percentage-unbounded")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(unbounded))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
+    void rejects_a_null_payers_list_with_the_published_envelope() throws Exception {
+        String groupId = createGroup();
+        String body = """
+                {"description":"Dinner","totalMinorUnits":100,"currency":"INR","splitMethod":"EQUAL",
+                 "payers":null,
+                 "participants":["%s","%s"],
+                 "occurredAt":"2026-11-01T00:00:00Z"}
+                """.formatted(ADMIN.value(), MEMBER.value());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/expenses").with(as(ADMIN_SUBJECT))
+                        .header("Idempotency-Key", "expense-null-payers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
     void rejects_a_currency_that_differs_from_the_group() throws Exception {
         String groupId = createGroup();
 
@@ -153,6 +270,15 @@ class ExpenseControllerTest {
                         .content(expenseJson(100, "INR")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    private String createGroupWithoutMember() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/groups").with(as(ADMIN_SUBJECT))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Flat 12\",\"currency\":\"INR\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.data.id");
     }
 
     private String createGroup() throws Exception {

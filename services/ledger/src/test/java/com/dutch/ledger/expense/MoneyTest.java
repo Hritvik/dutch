@@ -30,6 +30,8 @@ class MoneyTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new Money(Money.MAX_MINOR_UNITS + 1, "INR"))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Money(Long.MIN_VALUE, "INR"))
+                .isInstanceOf(IllegalArgumentException.class);
         assertThat(new Money(Money.MAX_MINOR_UNITS, "INR").minorUnits())
                 .isEqualTo(Money.MAX_MINOR_UNITS);
     }

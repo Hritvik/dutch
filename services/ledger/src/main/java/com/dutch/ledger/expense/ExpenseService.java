@@ -48,7 +48,7 @@ public class ExpenseService {
             throw new IllegalArgumentException("Idempotency-Key is required and bounded");
         }
         MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
-        Group group = groups.findById(new GroupId(groupId)).orElseThrow(GroupAccessDeniedException::new);
+        Group group = groups.findByIdForUpdate(new GroupId(groupId)).orElseThrow(GroupAccessDeniedException::new);
         if (!group.canRead(actor)) {
             throw new GroupAccessDeniedException();
         }

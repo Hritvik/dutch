@@ -18,10 +18,20 @@ public class JdbcGroupRepository implements GroupRepository {
 
     @Override
     public Optional<Group> findById(GroupId id) {
-        List<GroupRow> rows = jdbc.query("""
+        return load(id, false);
+    }
+
+    @Override
+    public Optional<Group> findByIdForUpdate(GroupId id) {
+        return load(id, true);
+    }
+
+    private Optional<Group> load(GroupId id, boolean lock) {
+        String sql = """
                 SELECT group_id, name, currency, state, aggregate_version
                 FROM member_group WHERE group_id = ?
-                """, (result, index) -> new GroupRow(
+                """ + (lock ? " FOR UPDATE" : "");
+        List<GroupRow> rows = jdbc.query(sql, (result, index) -> new GroupRow(
                 result.getString("group_id"),
                 result.getString("name"),
                 result.getString("currency"),

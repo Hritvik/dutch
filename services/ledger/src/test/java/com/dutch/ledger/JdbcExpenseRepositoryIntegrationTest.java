@@ -174,6 +174,34 @@ class JdbcExpenseRepositoryIntegrationTest {
     }
 
     @Test
+    void rejects_every_financial_mutation() {
+        Expense expense = Expense.create(new ExpenseId("exp_f12345678901234567"), GROUP, "Dinner",
+                100, "INR", SplitMethod.EQUAL,
+                java.util.List.of(new PayerContribution(ADMIN, 100)),
+                java.util.List.of(new ParticipantShare(ADMIN, 50),
+                        new ParticipantShare(MEMBER, 50)), NOW);
+        transactions.executeWithoutResult(status -> expenses.save(expense));
+
+        assertImmutable("UPDATE expense_revision SET total_minor_units = 999 WHERE expense_id = ?",
+                expense.id().value());
+        assertImmutable("UPDATE payer_contribution SET minor_units = 1 WHERE expense_id = ?",
+                expense.id().value());
+        assertImmutable("UPDATE participant_share SET minor_units = 1 WHERE expense_id = ?",
+                expense.id().value());
+        assertImmutable("UPDATE obligation_entry SET minor_units = 1 WHERE expense_id = ?",
+                expense.id().value());
+        assertImmutable("DELETE FROM payer_contribution WHERE expense_id = ?", expense.id().value());
+        assertImmutable("DELETE FROM participant_share WHERE expense_id = ?", expense.id().value());
+        assertImmutable("DELETE FROM expense_revision WHERE expense_id = ?", expense.id().value());
+        assertImmutable("DELETE FROM expense WHERE expense_id = ?", expense.id().value());
+    }
+
+    private void assertImmutable(String sql, Object... args) {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> jdbc.update(sql, args)))
+                .hasStackTraceContaining("immutable");
+    }
+
+    @Test
     void rejects_a_payer_who_is_not_a_group_member() {
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
             jdbc.update("""

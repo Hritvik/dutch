@@ -1,0 +1,12 @@
+{
+  "description": "Dinner",
+  "totalMinorUnits": 100,
+  "currency": "INR",
+  "splitMethod": "EXACT",
+  "payers": [{ "memberId": "mem_012345678901234567", "minorUnits": 100 }],
+  "exactShares": [
+    { "memberId": "mem_012345678901234567", "minorUnits": 40 },
+    { "memberId": "mem_112345678901234567", "minorUnits": 60 }
+  ],
+  "occurredAt": "2026-11-01T00:00:00Z"
+}

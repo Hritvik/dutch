@@ -32,8 +32,8 @@ final class ExpenseErrorHandler {
                 "The idempotency key was reused with a different request.");
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,
-            MissingRequestHeaderException.class})
+    @ExceptionHandler({IllegalArgumentException.class, NullPointerException.class,
+            HttpMessageNotReadableException.class, MissingRequestHeaderException.class})
     ResponseEntity<Map<String, Object>> invalid(HttpServletRequest request) {
         return error(request, HttpStatus.BAD_REQUEST, "invalid_request", "Request is invalid");
     }

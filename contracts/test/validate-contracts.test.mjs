@@ -128,3 +128,13 @@ test('requires bearer JWT authentication on every group route', async () => {
     }
   }
 });
+
+test('requires the split-specific input in the expense contract', async () => {
+  const fixture = JSON.parse(await readFile(
+    path.join(contractsRoot, 'http/fixtures/ledger/create-expense-exact.json'), 'utf8'));
+  delete fixture.exactShares;
+  const result = await validateHttpFixture(
+    contractsRoot, 'CreateExpenseRequest', fixture, 'http/ledger/openapi.yaml');
+  assert.equal(result.valid, false);
+  assert.match(result.issues.join('\n'), /exactShares/);
+});

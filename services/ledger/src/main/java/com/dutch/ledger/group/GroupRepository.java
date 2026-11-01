@@ -6,6 +6,9 @@ import java.util.Optional;
 public interface GroupRepository {
     Optional<Group> findById(GroupId id);
 
+    /** Loads the aggregate while holding its row lock, for a command transaction. */
+    Optional<Group> findByIdForUpdate(GroupId id);
+
     List<Group> findReadableBy(MemberId memberId);
 
     void saveNew(Group group);

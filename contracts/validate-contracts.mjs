@@ -150,6 +150,8 @@ const httpFixtures = [
   ['ledger-last-admin', 'ErrorResponse', 'http/fixtures/ledger/error-last-admin.json', 'http/ledger/openapi.yaml'],
   ['ledger-expense', 'ExpenseResponse', 'http/fixtures/ledger/expense-view.json', 'http/ledger/openapi.yaml'],
   ['ledger-create-expense', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-request.json', 'http/ledger/openapi.yaml'],
+  ['ledger-create-expense-exact', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-exact.json', 'http/ledger/openapi.yaml'],
+  ['ledger-create-expense-percentage', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-percentage.json', 'http/ledger/openapi.yaml'],
   ['ledger-idempotency-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-idempotency-conflict.json', 'http/ledger/openapi.yaml']
 ];
 

@@ -85,6 +85,11 @@ public class TestGroupConfiguration {
         }
 
         @Override
+        public Optional<Group> findByIdForUpdate(GroupId id) {
+            return findById(id);
+        }
+
+        @Override
         public List<Group> findReadableBy(MemberId memberId) {
             return groups.values().stream()
                     .filter(group -> group.canRead(memberId))

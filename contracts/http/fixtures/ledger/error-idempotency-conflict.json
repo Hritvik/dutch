@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "idempotency_conflict",
+    "message": "The idempotency key was reused with a different request.",
+    "correlationId": "cor_0123456789012345"
+  }
+}

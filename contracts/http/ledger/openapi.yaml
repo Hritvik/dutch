@@ -232,6 +232,39 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /api/v1/groups/{groupId}/expenses:
+    post:
+      operationId: createExpense
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+      responses:
+        "200":
+          description: The recorded expense and its exact entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
 components:
   securitySchemes:
     bearerAuth:
@@ -259,6 +292,15 @@ components:
       schema:
         type: string
         pattern: ^"?[0-9]+"?$
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Durable client command identity; a retry returns the stored result.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 200
   headers:
     CorrelationId:
       description: Correlation identifier echoed by the service.
@@ -449,6 +491,7 @@ components:
                 - conflict
                 - stale_version
                 - last_admin
+                - idempotency_conflict
                 - service_unavailable
             message:
               type: string
@@ -460,7 +503,173 @@ components:
                 - The request conflicts with the current group state
                 - The group changed. Refresh and retry.
                 - A group must retain at least one active Admin.
+                - The idempotency key was reused with a different request.
                 - Service is temporarily unavailable
             correlationId:
               type: string
               pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
+    MemberAmount:
+      type: object
+      additionalProperties: false
+      required:
+        - memberId
+        - minorUnits
+      properties:
+        memberId:
+          $ref: "#/components/schemas/MemberId"
+        minorUnits:
+          type: integer
+          minimum: 1
+    PayerRequest:
+      $ref: "#/components/schemas/MemberAmount"
+    ShareRequest:
+      $ref: "#/components/schemas/MemberAmount"
+    CreateExpenseRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - description
+        - totalMinorUnits
+        - currency
+        - splitMethod
+        - payers
+        - participants
+        - occurredAt
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
+        totalMinorUnits:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        splitMethod:
+          type: string
+          enum:
+            - EQUAL
+            - EXACT
+            - PERCENTAGE
+        payers:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/PayerRequest"
+        participants:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/MemberId"
+        exactShares:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/ShareRequest"
+        percentageBasisPoints:
+          type: array
+          maxItems: 1000
+          items:
+            type: integer
+            minimum: 1
+        occurredAt:
+          type: string
+          format: date-time
+    ObligationEntryView:
+      type: object
+      additionalProperties: false
+      required:
+        - expenseId
+        - revision
+        - debtor
+        - creditor
+        - minorUnits
+        - currency
+        - algorithmVersion
+      properties:
+        expenseId:
+          type: string
+          pattern: ^exp_[A-Za-z0-9_-]{16,128}$
+        revision:
+          type: integer
+          minimum: 1
+        debtor:
+          $ref: "#/components/schemas/MemberId"
+        creditor:
+          $ref: "#/components/schemas/MemberId"
+        minorUnits:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        algorithmVersion:
+          type: string
+          minLength: 1
+          maxLength: 64
+    ExpenseView:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - groupId
+        - description
+        - totalMinorUnits
+        - currency
+        - splitMethod
+        - payers
+        - shares
+        - entries
+        - occurredAt
+        - revision
+      properties:
+        id:
+          type: string
+          pattern: ^exp_[A-Za-z0-9_-]{16,128}$
+        groupId:
+          $ref: "#/components/schemas/GroupId"
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
+        totalMinorUnits:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        splitMethod:
+          type: string
+          enum:
+            - EQUAL
+            - EXACT
+            - PERCENTAGE
+        payers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberAmount"
+        shares:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberAmount"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObligationEntryView"
+        occurredAt:
+          type: string
+          format: date-time
+        revision:
+          type: integer
+          minimum: 1
+    ExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/ExpenseView"

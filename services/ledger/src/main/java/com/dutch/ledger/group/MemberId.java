@@ -1,5 +1,6 @@
 package com.dutch.ledger.group;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -14,6 +15,11 @@ public record MemberId(String value) implements Comparable<MemberId> {
         if (!PATTERN.matcher(value).matches()) {
             throw new IllegalArgumentException("member id does not match the pinned format");
         }
+    }
+
+    @JsonCreator
+    public static MemberId of(String value) {
+        return new MemberId(value);
     }
 
     @JsonValue

@@ -1,6 +1,11 @@
 package com.dutch.ledger;
 
 import com.dutch.ledger.group.ConcurrentGroupUpdateException;
+import com.dutch.ledger.expense.BalanceProjection;
+import com.dutch.ledger.expense.Expense;
+import com.dutch.ledger.expense.ExpenseRepository;
+import com.dutch.ledger.expense.IdempotencyStore;
+import com.dutch.ledger.expense.ObligationEntry;
 import com.dutch.ledger.group.Group;
 import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
@@ -10,11 +15,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 @TestConfiguration
 public class TestGroupConfiguration {
@@ -46,6 +56,23 @@ public class TestGroupConfiguration {
     @Bean
     JdbcTemplate jdbcTemplate() {
         return Mockito.mock(JdbcTemplate.class);
+    }
+
+    @Bean
+    @Primary
+    ExpenseRepository expenseRepository() {
+        return new InMemoryExpenseRepository();
+    }
+
+    @Bean
+    @Primary
+    IdempotencyStore idempotencyStore() {
+        return new InMemoryIdempotencyStore();
+    }
+
+    @Bean
+    PlatformTransactionManager transactionManager() {
+        return new NoOpTransactionManager();
     }
 
     public static final class InMemoryGroupRepository implements GroupRepository {
@@ -83,5 +110,71 @@ public class TestGroupConfiguration {
     private static Group copy(Group group) {
         return Group.restore(group.id(), group.name(), group.currency(), group.state(),
                 group.version(), group.memberships());
+    }
+
+    static final class InMemoryExpenseRepository implements ExpenseRepository {
+        private final java.util.List<Expense> saved = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void save(Expense expense) {
+            saved.add(expense);
+        }
+
+        @Override
+        public java.util.List<ObligationEntry> entriesFor(GroupId groupId, String currency) {
+            return saved.stream()
+                    .filter(expense -> expense.groupId().equals(groupId)
+                            && expense.currency().equals(currency))
+                    .flatMap(expense -> expense.obligationEntries().stream())
+                    .toList();
+        }
+
+        @Override
+        public BalanceProjection projectionFor(GroupId groupId, String currency) {
+            return BalanceProjection.from(entriesFor(groupId, currency), currency);
+        }
+
+        int size() {
+            return saved.size();
+        }
+    }
+
+    static final class InMemoryIdempotencyStore implements IdempotencyStore {
+        private record Key(String actor, String command, String key) {
+        }
+
+        private final java.util.Map<Key, Outcome> outcomes = new ConcurrentHashMap<>();
+
+        @Override
+        public java.util.Optional<Outcome> find(String actorMemberId, String command, String idempotencyKey) {
+            return java.util.Optional.ofNullable(outcomes.get(new Key(actorMemberId, command, idempotencyKey)));
+        }
+
+        @Override
+        public boolean reserve(String actorMemberId, String command, String idempotencyKey, String requestHash) {
+            return outcomes.putIfAbsent(new Key(actorMemberId, command, idempotencyKey),
+                    new Outcome(requestHash, "{}")) == null;
+        }
+
+        @Override
+        public void complete(String actorMemberId, String command, String idempotencyKey, String responseJson) {
+            outcomes.computeIfPresent(new Key(actorMemberId, command, idempotencyKey),
+                    (key, outcome) -> new Outcome(outcome.requestHash(), responseJson));
+        }
+    }
+
+    static final class NoOpTransactionManager implements PlatformTransactionManager {
+        @Override
+        public TransactionStatus getTransaction(TransactionDefinition definition) {
+            return new SimpleTransactionStatus();
+        }
+
+        @Override
+        public void commit(TransactionStatus status) {
+        }
+
+        @Override
+        public void rollback(TransactionStatus status) {
+        }
     }
 }

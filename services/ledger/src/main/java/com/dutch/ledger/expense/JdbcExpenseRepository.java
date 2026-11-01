@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Persists one immutable Expense revision and rebuilds its balance projection. */
 @Repository
-public class JdbcExpenseRepository {
+public class JdbcExpenseRepository implements ExpenseRepository {
 
     private final JdbcTemplate jdbc;
 
@@ -23,6 +23,7 @@ public class JdbcExpenseRepository {
         return "group:" + groupId.value() + ":" + currency;
     }
 
+    @Override
     @Transactional
     public void save(Expense expense) {
         String streamId = streamId(expense.groupId(), expense.currency());
@@ -91,6 +92,7 @@ public class JdbcExpenseRepository {
                 """, streamId, expense.currency(), streamVersion, streamId, streamId);
     }
 
+    @Override
     public List<ObligationEntry> entriesFor(GroupId groupId, String currency) {
         return jdbc.query("""
                 SELECT expense_id, revision, debtor_member_id, creditor_member_id, minor_units,
@@ -106,6 +108,7 @@ public class JdbcExpenseRepository {
                 result.getString("algorithm_version")), streamId(groupId, currency));
     }
 
+    @Override
     public BalanceProjection projectionFor(GroupId groupId, String currency) {
         String streamId = streamId(groupId, currency);
         SortedMap<com.dutch.ledger.group.MemberId, Long> balances = new TreeMap<>();

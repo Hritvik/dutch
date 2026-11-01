@@ -1,5 +1,6 @@
 package com.dutch.ledger.expense;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -12,6 +13,11 @@ public record ExpenseId(String value) {
         if (!PATTERN.matcher(value).matches()) {
             throw new IllegalArgumentException("expense id does not match the pinned format");
         }
+    }
+
+    @JsonCreator
+    public static ExpenseId of(String value) {
+        return new ExpenseId(value);
     }
 
     @JsonValue

@@ -147,7 +147,10 @@ const httpFixtures = [
   ['ledger-role', 'RoleRequest', 'http/fixtures/ledger/role-request.json', 'http/ledger/openapi.yaml'],
   ['ledger-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-conflict.json', 'http/ledger/openapi.yaml'],
   ['ledger-stale-version', 'ErrorResponse', 'http/fixtures/ledger/error-stale-version.json', 'http/ledger/openapi.yaml'],
-  ['ledger-last-admin', 'ErrorResponse', 'http/fixtures/ledger/error-last-admin.json', 'http/ledger/openapi.yaml']
+  ['ledger-last-admin', 'ErrorResponse', 'http/fixtures/ledger/error-last-admin.json', 'http/ledger/openapi.yaml'],
+  ['ledger-expense', 'ExpenseResponse', 'http/fixtures/ledger/expense-view.json', 'http/ledger/openapi.yaml'],
+  ['ledger-create-expense', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-request.json', 'http/ledger/openapi.yaml'],
+  ['ledger-idempotency-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-idempotency-conflict.json', 'http/ledger/openapi.yaml']
 ];
 
 export async function validateContracts(contractsRoot, overrides = {}) {

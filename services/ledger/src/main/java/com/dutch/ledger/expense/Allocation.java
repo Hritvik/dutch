@@ -78,10 +78,10 @@ public record Allocation(
         if (basisPoints.size() != participants.size()) {
             throw new IllegalArgumentException("basis points must match the participant list");
         }
-        int points = 0;
+        long points = 0;
         for (Integer value : basisPoints) {
-            if (value == null || value <= 0) {
-                throw new IllegalArgumentException("basis points must be positive");
+            if (value == null || value <= 0 || value > TOTAL_BASIS_POINTS) {
+                throw new IllegalArgumentException("each basis point value must be between 1 and 10000");
             }
             points += value;
         }

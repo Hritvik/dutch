@@ -8,7 +8,8 @@ CREATE TABLE financial_stream (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK ((scope_type = 'GROUP' AND group_id IS NOT NULL)
-        OR (scope_type = 'DIRECT_PAIR' AND group_id IS NULL))
+        OR (scope_type = 'DIRECT_PAIR' AND group_id IS NULL)),
+    UNIQUE (group_id, currency, stream_id)
 );
 
 CREATE TABLE expense (
@@ -21,7 +22,8 @@ CREATE TABLE expense (
     algorithm_version TEXT NOT NULL,
     current_revision BIGINT NOT NULL DEFAULT 1 CHECK (current_revision > 0),
     occurred_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (expense_id, group_id)
 );
 
 CREATE TABLE expense_revision (
@@ -40,26 +42,33 @@ CREATE TABLE expense_revision (
 CREATE TABLE payer_contribution (
     expense_id TEXT NOT NULL,
     revision BIGINT NOT NULL,
+    group_id TEXT NOT NULL,
     member_id TEXT NOT NULL CHECK (member_id ~ '^mem_[A-Za-z0-9_-]{16,128}$'),
     minor_units BIGINT NOT NULL CHECK (minor_units > 0),
     PRIMARY KEY (expense_id, revision, member_id),
-    FOREIGN KEY (expense_id, revision) REFERENCES expense_revision (expense_id, revision)
+    FOREIGN KEY (expense_id, revision) REFERENCES expense_revision (expense_id, revision),
+    FOREIGN KEY (expense_id, group_id) REFERENCES expense (expense_id, group_id),
+    FOREIGN KEY (group_id, member_id) REFERENCES group_membership (group_id, member_id)
 );
 
 CREATE TABLE participant_share (
     expense_id TEXT NOT NULL,
     revision BIGINT NOT NULL,
+    group_id TEXT NOT NULL,
     member_id TEXT NOT NULL CHECK (member_id ~ '^mem_[A-Za-z0-9_-]{16,128}$'),
     minor_units BIGINT NOT NULL CHECK (minor_units > 0),
     PRIMARY KEY (expense_id, revision, member_id),
-    FOREIGN KEY (expense_id, revision) REFERENCES expense_revision (expense_id, revision)
+    FOREIGN KEY (expense_id, revision) REFERENCES expense_revision (expense_id, revision),
+    FOREIGN KEY (expense_id, group_id) REFERENCES expense (expense_id, group_id),
+    FOREIGN KEY (group_id, member_id) REFERENCES group_membership (group_id, member_id)
 );
 
 CREATE TABLE obligation_entry (
     entry_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     expense_id TEXT NOT NULL,
     revision BIGINT NOT NULL,
-    stream_id TEXT NOT NULL REFERENCES financial_stream (stream_id),
+    group_id TEXT NOT NULL,
+    stream_id TEXT NOT NULL,
     debtor_member_id TEXT NOT NULL CHECK (debtor_member_id ~ '^mem_[A-Za-z0-9_-]{16,128}$'),
     creditor_member_id TEXT NOT NULL CHECK (creditor_member_id ~ '^mem_[A-Za-z0-9_-]{16,128}$'),
     minor_units BIGINT NOT NULL CHECK (minor_units > 0),
@@ -67,7 +76,13 @@ CREATE TABLE obligation_entry (
     algorithm_version TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (debtor_member_id <> creditor_member_id),
-    FOREIGN KEY (expense_id, revision) REFERENCES expense_revision (expense_id, revision)
+    FOREIGN KEY (expense_id, revision) REFERENCES expense_revision (expense_id, revision),
+    FOREIGN KEY (expense_id, group_id) REFERENCES expense (expense_id, group_id),
+    FOREIGN KEY (group_id, currency, stream_id)
+        REFERENCES financial_stream (group_id, currency, stream_id),
+    FOREIGN KEY (group_id, debtor_member_id) REFERENCES group_membership (group_id, member_id),
+    FOREIGN KEY (group_id, creditor_member_id) REFERENCES group_membership (group_id, member_id),
+    UNIQUE (expense_id, revision, debtor_member_id, creditor_member_id)
 );
 
 CREATE INDEX obligation_entry_stream_idx ON obligation_entry (stream_id, entry_id);
@@ -153,3 +168,21 @@ CREATE CONSTRAINT TRIGGER obligation_entry_requires_balance
 AFTER INSERT OR UPDATE OR DELETE ON obligation_entry
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION expense_revision_balances();
+
+-- Financial evidence is insert-only; only the rebuildable projections may change.
+CREATE OR REPLACE FUNCTION reject_financial_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION '% is immutable financial evidence', TG_TABLE_NAME;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER expense_immutable BEFORE UPDATE OR DELETE ON expense
+FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();
+CREATE TRIGGER expense_revision_immutable BEFORE UPDATE OR DELETE ON expense_revision
+FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();
+CREATE TRIGGER payer_contribution_immutable BEFORE UPDATE OR DELETE ON payer_contribution
+FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();
+CREATE TRIGGER participant_share_immutable BEFORE UPDATE OR DELETE ON participant_share
+FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();
+CREATE TRIGGER obligation_entry_immutable BEFORE UPDATE OR DELETE ON obligation_entry
+FOR EACH ROW EXECUTE FUNCTION reject_financial_mutation();

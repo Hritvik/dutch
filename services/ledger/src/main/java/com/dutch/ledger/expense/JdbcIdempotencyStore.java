@@ -38,9 +38,12 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
 
     @Override
     public void complete(String actorMemberId, String command, String idempotencyKey, String responseJson) {
-        jdbc.update("""
+        int updated = jdbc.update("""
                 UPDATE idempotency_outcome SET response = CAST(? AS jsonb)
                 WHERE actor_member_id = ? AND command = ? AND idempotency_key = ?
                 """, responseJson, actorMemberId, command, idempotencyKey);
+        if (updated != 1) {
+            throw new IllegalStateException("idempotency reservation is missing");
+        }
     }
 }

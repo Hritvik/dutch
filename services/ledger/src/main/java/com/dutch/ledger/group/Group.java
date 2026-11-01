@@ -224,6 +224,18 @@ public final class Group {
         return canCollaborate(memberId);
     }
 
+    /**
+     * Placeholder, Invited, and Active members may be allocated in new expenses;
+     * Inactive and unknown members may not.
+     */
+    public boolean canBeAllocated(MemberId memberId) {
+        Membership membership = memberships.get(memberId);
+        return membership != null
+                && (membership.state() == MembershipState.INVITED
+                || membership.state() == MembershipState.PLACEHOLDER
+                || membership.state() == MembershipState.ACTIVE);
+    }
+
     public boolean canRecordSettlement(MemberId memberId) {
         return isActive(memberId);
     }

@@ -11,9 +11,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,8 +44,8 @@ public class ExpenseService {
     public ExpenseView create(String appSubject, String groupId, String idempotencyKey,
                               CreateExpenseRequest request) {
         Objects.requireNonNull(request, "request");
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new IllegalArgumentException("Idempotency-Key is required");
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 200) {
+            throw new IllegalArgumentException("Idempotency-Key is required and bounded");
         }
         MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
         Group group = groups.findById(new GroupId(groupId)).orElseThrow(GroupAccessDeniedException::new);
@@ -57,16 +59,16 @@ public class ExpenseService {
             throw new IllegalArgumentException("currency must match the group currency");
         }
 
-        String requestHash = hash(request);
+        String requestHash = hash(group.id().value(), request);
         Optional<IdempotencyStore.Outcome> existing =
                 idempotency.find(actor.value(), COMMAND, idempotencyKey);
         if (existing.isPresent()) {
-            return replay(existing.get(), requestHash);
+            return replay(existing.get(), requestHash, group.id().value());
         }
         if (!idempotency.reserve(actor.value(), COMMAND, idempotencyKey, requestHash)) {
             IdempotencyStore.Outcome raced = idempotency.find(actor.value(), COMMAND, idempotencyKey)
                     .orElseThrow(() -> new IllegalStateException("idempotency reservation disappeared"));
-            return replay(raced, requestHash);
+            return replay(raced, requestHash, group.id().value());
         }
 
         Expense expense = build(group, request);
@@ -76,12 +78,18 @@ public class ExpenseService {
         return view;
     }
 
-    private ExpenseView replay(IdempotencyStore.Outcome outcome, String requestHash) {
+    private ExpenseView replay(IdempotencyStore.Outcome outcome, String requestHash, String groupId) {
         if (!outcome.requestHash().equals(requestHash)) {
             throw new IdempotencyConflictException();
         }
         try {
-            return objectMapper.readValue(outcome.responseJson(), ExpenseView.class);
+            ExpenseView view = objectMapper.readValue(outcome.responseJson(), ExpenseView.class);
+            if (!groupId.equals(view.groupId())) {
+                throw new IdempotencyConflictException();
+            }
+            return view;
+        } catch (IdempotencyConflictException exception) {
+            throw exception;
         } catch (Exception exception) {
             throw new IllegalStateException("idempotent expense result is unavailable", exception);
         }
@@ -97,27 +105,46 @@ public class ExpenseService {
                 .toList();
         List<MemberId> participants = request.participants() == null ? List.of()
                 : request.participants().stream().map(MemberId::new).toList();
+        if (request.splitMethod() == null) {
+            throw new IllegalArgumentException("splitMethod is required");
+        }
         Allocation allocation = switch (request.splitMethod()) {
             case EQUAL -> Allocation.equal(request.totalMinorUnits(), request.currency(), participants);
-            case EXACT -> Allocation.exact(request.totalMinorUnits(), request.currency(),
-                    Objects.requireNonNull(request.exactShares(), "exactShares").stream()
-                            .map(share -> new ParticipantShare(
-                                    new MemberId(share.memberId()), share.minorUnits()))
-                            .toList());
-            case PERCENTAGE -> Allocation.percentage(request.totalMinorUnits(), request.currency(),
-                    participants, Objects.requireNonNull(request.percentageBasisPoints(),
-                            "percentageBasisPoints"));
-            default -> throw new IllegalArgumentException("unsupported split method");
+            case EXACT -> {
+                if (request.exactShares() == null) {
+                    throw new IllegalArgumentException("exactShares is required for EXACT");
+                }
+                yield Allocation.exact(request.totalMinorUnits(), request.currency(),
+                        request.exactShares().stream()
+                                .map(share -> new ParticipantShare(
+                                        new MemberId(share.memberId()), share.minorUnits()))
+                                .toList());
+            }
+            case PERCENTAGE -> {
+                if (request.percentageBasisPoints() == null) {
+                    throw new IllegalArgumentException("percentageBasisPoints is required for PERCENTAGE");
+                }
+                yield Allocation.percentage(request.totalMinorUnits(), request.currency(),
+                        participants, request.percentageBasisPoints());
+            }
         };
+        Set<MemberId> involved = new HashSet<>();
+        payers.forEach(payer -> involved.add(payer.memberId()));
+        allocation.shares().forEach(share -> involved.add(share.memberId()));
+        for (MemberId member : involved) {
+            if (!group.canBeAllocated(member)) {
+                throw new IllegalArgumentException("a payer or participant is not allocatable in this group");
+            }
+        }
         return Expense.create(newId(), group.id(), request.description(), request.totalMinorUnits(),
                 request.currency(), request.splitMethod(), payers, allocation.shares(),
                 request.occurredAt());
     }
 
-    private String hash(CreateExpenseRequest request) {
+    private String hash(String groupId, CreateExpenseRequest request) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(serialize(request).getBytes(StandardCharsets.UTF_8));
+                    .digest((groupId + "|" + serialize(request)).getBytes(StandardCharsets.UTF_8));
             StringBuilder hex = new StringBuilder(digest.length * 2);
             for (byte value : digest) {
                 hex.append(String.format("%02x", value));

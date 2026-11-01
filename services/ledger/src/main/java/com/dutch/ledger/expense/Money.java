@@ -14,7 +14,7 @@ public record Money(long minorUnits, String currency) {
         if (!CURRENCY.matcher(Objects.requireNonNull(currency, "currency")).matches()) {
             throw new IllegalArgumentException("currency must be an ISO 4217 code");
         }
-        if (Math.abs(minorUnits) > MAX_MINOR_UNITS) {
+        if (minorUnits < -MAX_MINOR_UNITS || minorUnits > MAX_MINOR_UNITS) {
             throw new IllegalArgumentException("amount is outside the supported bounds");
         }
     }

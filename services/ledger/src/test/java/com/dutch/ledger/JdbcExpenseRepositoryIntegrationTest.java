@@ -11,6 +11,7 @@ import com.dutch.ledger.expense.PayerContribution;
 import com.dutch.ledger.expense.SplitMethod;
 import com.dutch.ledger.group.Group;
 import com.dutch.ledger.group.GroupId;
+import com.dutch.ledger.group.GroupRole;
 import com.dutch.ledger.group.JdbcGroupRepository;
 import com.dutch.ledger.group.MemberId;
 import java.time.Instant;
@@ -53,21 +54,20 @@ class JdbcExpenseRepositoryIntegrationTest {
         expenses = new JdbcExpenseRepository(jdbc);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(jdbc.getDataSource()));
         JdbcGroupRepository groups = new JdbcGroupRepository(jdbc);
-        transactions.executeWithoutResult(status ->
-                groups.saveNew(Group.create(GROUP, "Flat", "INR", ADMIN, NOW)));
+        transactions.executeWithoutResult(status -> {
+            Group group = Group.create(GROUP, "Flat", "INR", ADMIN, NOW);
+            group.invite(ADMIN, MEMBER, GroupRole.MEMBER, NOW);
+            group.activate(MEMBER, MEMBER, NOW);
+            groups.saveNew(group);
+        });
     }
 
     @BeforeEach
     void cleanFinancialRows() {
-        transactions.executeWithoutResult(status -> {
-            jdbc.update("DELETE FROM member_balance_projection");
-            jdbc.update("DELETE FROM obligation_entry");
-            jdbc.update("DELETE FROM participant_share");
-            jdbc.update("DELETE FROM payer_contribution");
-            jdbc.update("DELETE FROM expense_revision");
-            jdbc.update("DELETE FROM expense");
-            jdbc.update("DELETE FROM financial_stream");
-        });
+        jdbc.execute("""
+                TRUNCATE member_balance_projection, obligation_entry, participant_share,
+                    payer_contribution, expense_revision, expense, financial_stream CASCADE
+                """);
     }
 
     @Test
@@ -110,6 +110,113 @@ class JdbcExpenseRepositoryIntegrationTest {
     }
 
     @Test
+    void rejects_an_entry_that_disagrees_with_the_positions() {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            jdbc.update("""
+                    INSERT INTO financial_stream (stream_id, scope_type, group_id, currency)
+                    VALUES ('group:bad-entry:INR', 'GROUP', ?, 'INR')
+                    """, GROUP.value());
+            jdbc.update("""
+                    INSERT INTO expense (expense_id, group_id, description, currency, total_minor_units,
+                        split_method, algorithm_version, occurred_at)
+                    VALUES ('exp_a12345678901234567', ?, 'Bad entry', 'INR', 100, 'EQUAL', 'v1', now())
+                    """, GROUP.value());
+            jdbc.update("""
+                    INSERT INTO expense_revision (expense_id, revision, description, total_minor_units,
+                        currency, split_method, algorithm_version, occurred_at)
+                    VALUES ('exp_a12345678901234567', 1, 'Bad entry', 100, 'INR', 'EQUAL', 'v1', now())
+                    """);
+            jdbc.update("""
+                    INSERT INTO payer_contribution
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_a12345678901234567', 1, ?, ?, 100)
+                    """, GROUP.value(), ADMIN.value());
+            jdbc.update("""
+                    INSERT INTO participant_share
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_a12345678901234567', 1, ?, ?, 100)
+                    """, GROUP.value(), ADMIN.value());
+            jdbc.update("""
+                    INSERT INTO obligation_entry (expense_id, revision, group_id, stream_id,
+                        debtor_member_id, creditor_member_id, minor_units, currency, algorithm_version)
+                    VALUES ('exp_a12345678901234567', 1, ?, 'group:bad-entry:INR', ?, ?, 10, 'INR', 'v1')
+                    """, GROUP.value(), MEMBER.value(), ADMIN.value());
+        })).hasStackTraceContaining("entries must match");
+    }
+
+    @Test
+    void rejects_an_update_to_immutable_evidence() {
+        Expense expense = Expense.create(new ExpenseId("exp_b12345678901234567"), GROUP, "Dinner",
+                100, "INR", SplitMethod.EQUAL,
+                java.util.List.of(new PayerContribution(ADMIN, 100)),
+                java.util.List.of(new ParticipantShare(ADMIN, 50),
+                        new ParticipantShare(MEMBER, 50)), NOW);
+        transactions.executeWithoutResult(status -> expenses.save(expense));
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status ->
+                jdbc.update("UPDATE expense SET total_minor_units = 999 WHERE expense_id = ?",
+                        expense.id().value())))
+                .hasStackTraceContaining("immutable");
+    }
+
+    @Test
+    void rejects_a_delete_of_immutable_evidence() {
+        Expense expense = Expense.create(new ExpenseId("exp_e12345678901234567"), GROUP, "Dinner",
+                100, "INR", SplitMethod.EQUAL,
+                java.util.List.of(new PayerContribution(ADMIN, 100)),
+                java.util.List.of(new ParticipantShare(ADMIN, 50),
+                        new ParticipantShare(MEMBER, 50)), NOW);
+        transactions.executeWithoutResult(status -> expenses.save(expense));
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status ->
+                jdbc.update("DELETE FROM obligation_entry WHERE expense_id = ?", expense.id().value())))
+                .hasStackTraceContaining("immutable");
+    }
+
+    @Test
+    void rejects_a_payer_who_is_not_a_group_member() {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            jdbc.update("""
+                    INSERT INTO financial_stream (stream_id, scope_type, group_id, currency)
+                    VALUES ('group:bad-member:INR', 'GROUP', ?, 'INR')
+                    """, GROUP.value());
+            jdbc.update("""
+                    INSERT INTO expense (expense_id, group_id, description, currency, total_minor_units,
+                        split_method, algorithm_version, occurred_at)
+                    VALUES ('exp_c12345678901234567', ?, 'Bad member', 'INR', 100, 'EQUAL', 'v1', now())
+                    """, GROUP.value());
+            jdbc.update("""
+                    INSERT INTO expense_revision (expense_id, revision, description, total_minor_units,
+                        currency, split_method, algorithm_version, occurred_at)
+                    VALUES ('exp_c12345678901234567', 1, 'Bad member', 100, 'INR', 'EQUAL', 'v1', now())
+                    """);
+            jdbc.update("""
+                    INSERT INTO payer_contribution
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_c12345678901234567', 1, ?, ?, 100)
+                    """, GROUP.value(), "mem_999999999999999999");
+        })).hasStackTraceContaining("foreign key");
+    }
+
+    @Test
+    void rejects_an_entry_for_another_stream() {
+        Expense expense = Expense.create(new ExpenseId("exp_d12345678901234567"), GROUP, "Dinner",
+                100, "INR", SplitMethod.EQUAL,
+                java.util.List.of(new PayerContribution(ADMIN, 100)),
+                java.util.List.of(new ParticipantShare(ADMIN, 50),
+                        new ParticipantShare(MEMBER, 50)), NOW);
+        transactions.executeWithoutResult(status -> expenses.save(expense));
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status ->
+                jdbc.update("""
+                        INSERT INTO obligation_entry (expense_id, revision, group_id, stream_id,
+                            debtor_member_id, creditor_member_id, minor_units, currency, algorithm_version)
+                        VALUES (?, 1, ?, 'group:other:INR', ?, ?, 10, 'INR', 'v1')
+                        """, expense.id().value(), GROUP.value(), ADMIN.value(), MEMBER.value())))
+                .hasStackTraceContaining("foreign key");
+    }
+
+    @Test
     void rejects_a_revision_whose_contributions_do_not_match_the_total_at_commit() {
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
             jdbc.update("""
@@ -127,13 +234,15 @@ class JdbcExpenseRepositoryIntegrationTest {
                     VALUES ('exp_912345678901234567', 1, 'Bad', 100, 'INR', 'EQUAL', 'v1', now())
                     """);
             jdbc.update("""
-                    INSERT INTO payer_contribution (expense_id, revision, member_id, minor_units)
-                    VALUES ('exp_912345678901234567', 1, ?, 90)
-                    """, ADMIN.value());
+                    INSERT INTO payer_contribution
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_912345678901234567', 1, ?, ?, 90)
+                    """, GROUP.value(), ADMIN.value());
             jdbc.update("""
-                    INSERT INTO participant_share (expense_id, revision, member_id, minor_units)
-                    VALUES ('exp_912345678901234567', 1, ?, 100)
-                    """, ADMIN.value());
+                    INSERT INTO participant_share
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_912345678901234567', 1, ?, ?, 100)
+                    """, GROUP.value(), ADMIN.value());
         })).hasStackTraceContaining("contributions/shares must equal 100");
     }
 }

@@ -54,25 +54,27 @@ public class JdbcExpenseRepository implements ExpenseRepository {
 
         for (PayerContribution payer : expense.payers()) {
             jdbc.update("""
-                    INSERT INTO payer_contribution (expense_id, revision, member_id, minor_units)
-                    VALUES (?, ?, ?, ?)
-                    """, expense.id().value(), expense.revision(), payer.memberId().value(),
-                    payer.minorUnits());
+                    INSERT INTO payer_contribution
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, expense.id().value(), expense.revision(), expense.groupId().value(),
+                    payer.memberId().value(), payer.minorUnits());
         }
         for (ParticipantShare share : expense.shares()) {
             jdbc.update("""
-                    INSERT INTO participant_share (expense_id, revision, member_id, minor_units)
-                    VALUES (?, ?, ?, ?)
-                    """, expense.id().value(), expense.revision(), share.memberId().value(),
-                    share.minorUnits());
+                    INSERT INTO participant_share
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, expense.id().value(), expense.revision(), expense.groupId().value(),
+                    share.memberId().value(), share.minorUnits());
         }
         for (ObligationEntry entry : expense.obligationEntries()) {
             jdbc.update("""
-                    INSERT INTO obligation_entry (expense_id, revision, stream_id, debtor_member_id,
-                        creditor_member_id, minor_units, currency, algorithm_version)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, entry.expenseId().value(), entry.revision(), streamId,
-                    entry.debtor().value(), entry.creditor().value(), entry.minorUnits(),
+                    INSERT INTO obligation_entry (expense_id, revision, group_id, stream_id,
+                        debtor_member_id, creditor_member_id, minor_units, currency, algorithm_version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, entry.expenseId().value(), entry.revision(), expense.groupId().value(),
+                    streamId, entry.debtor().value(), entry.creditor().value(), entry.minorUnits(),
                     entry.currency(), entry.algorithmVersion());
         }
 

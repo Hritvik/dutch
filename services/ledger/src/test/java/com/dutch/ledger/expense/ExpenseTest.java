@@ -88,7 +88,11 @@ class ExpenseTest {
                 List.of(new ParticipantShare(A, 40), new ParticipantShare(B, 30),
                         new ParticipantShare(C, 30)), NOW);
 
-        assertThat(expense.obligationEntries()).isEqualTo(expense.obligationEntries());
+        Expense copy = Expense.create(EXPENSE, GROUP, "Dinner", 100, "INR", SplitMethod.EQUAL,
+                List.of(new PayerContribution(A, 100)),
+                List.of(new ParticipantShare(A, 40), new ParticipantShare(B, 30),
+                        new ParticipantShare(C, 30)), NOW);
+        assertThat(expense.obligationEntries()).isEqualTo(copy.obligationEntries());
         BalanceProjection projection = BalanceProjection.from(expense.obligationEntries(), "INR");
         assertThat(projection.balances()).isEqualTo(expense.netPositions());
         assertThat(projection.balances().values().stream().mapToLong(Long::longValue).sum()).isZero();

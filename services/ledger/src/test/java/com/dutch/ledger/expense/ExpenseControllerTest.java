@@ -119,7 +119,6 @@ class ExpenseControllerTest {
     @Test
     void an_inactive_member_cannot_create_an_expense() throws Exception {
         String groupId = createGroup();
-        inviteAndActivate(groupId);
         mockMvc.perform(delete("/api/v1/groups/" + groupId + "/members/" + MEMBER.value())
                         .with(as(ADMIN_SUBJECT))
                         .header("If-Match", "\"2\""))
@@ -162,10 +161,7 @@ class ExpenseControllerTest {
                         .content("{\"name\":\"Flat 12\",\"currency\":\"INR\"}"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$.data.id");
-    }
-
-    private void inviteAndActivate(String groupId) throws Exception {
+        String groupId = JsonPath.read(body, "$.data.id");
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
                         .header("If-Match", "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -175,6 +171,7 @@ class ExpenseControllerTest {
                         .with(as(MEMBER_SUBJECT))
                         .header("If-Match", "\"1\""))
                 .andExpect(status().isOk());
+        return groupId;
     }
 
     private static String expenseJson(long total, String currency) {

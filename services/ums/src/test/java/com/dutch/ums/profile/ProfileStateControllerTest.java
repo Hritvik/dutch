@@ -168,5 +168,8 @@ class ProfileStateControllerTest {
 
         mvc.perform(get("/api/v1/me").with(jwt().jwt(j -> j.subject(SUBJECT))))
                 .andExpect(status().isConflict());
+        mvc.perform(get("/api/v1/me/profile-state").with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("PROFILE_REQUIRED"));
     }
 }

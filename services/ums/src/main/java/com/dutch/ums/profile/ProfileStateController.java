@@ -28,12 +28,20 @@ public final class ProfileStateController {
         return ResponseEntity.ok(Map.of("data", data));
     }
 
-    /** Readiness is only visible while the Member lifecycle is active; otherwise the profile is required. */
+    /** Readiness is only visible while the lifecycle is active and a display name exists. */
     private ProfileState visibleState(java.util.Optional<MemberProfile> profile) {
-        if (profile.isEmpty() || profile.orElseThrow().lifecycleState() != MemberLifecycleState.ACTIVE) {
+        if (profile.isEmpty()) {
             return ProfileState.PROFILE_REQUIRED;
         }
-        return profile.orElseThrow().profileState();
+        var member = profile.orElseThrow();
+        if (member.lifecycleState() != MemberLifecycleState.ACTIVE) {
+            return ProfileState.PROFILE_REQUIRED;
+        }
+        if (member.profileState() == ProfileState.PROFILE_READY
+                && (member.displayName() == null || member.displayName().isBlank())) {
+            return ProfileState.PROFILE_REQUIRED;
+        }
+        return member.profileState();
     }
 
     private static String correlationId(HttpServletRequest request) {

@@ -33,6 +33,8 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/Unavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/me:
     get:
       operationId: getCurrentMemberProfile
@@ -70,6 +72,8 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '503':
           $ref: '#/components/responses/Unavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /actuator/health/readiness:
     get:
       operationId: getReadiness
@@ -137,6 +141,15 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Unavailable:
       description: The service is temporarily unavailable.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: The request could not be completed.
       headers:
         X-Correlation-ID:
           $ref: '#/components/headers/CorrelationId'

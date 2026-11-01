@@ -38,13 +38,13 @@ export default function GroupDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     setError(null);
     try {
       const material = await sessionStore.load();
       if (!material) {
         setError('Sign in again to open this group.');
-        return;
+        return false;
       }
       const loaded = await fetchGroup(config.apiBaseUrl, material.accessToken, id);
       setToken(material.accessToken);
@@ -55,8 +55,10 @@ export default function GroupDetailScreen() {
       } catch {
         setMemberId(null);
       }
+      return true;
     } catch {
       setError('We could not load this group.');
+      return false;
     }
   }, [id]);
 
@@ -72,8 +74,10 @@ export default function GroupDetailScreen() {
       setGroup(await action());
     } catch (failure) {
       if (failure instanceof GroupHttpError && failure.code === 'stale_version') {
-        await refresh();
-        setError('The group changed. Refreshed the latest state.');
+        const refreshed = await refresh();
+        setError(refreshed
+          ? 'The group changed. Refreshed the latest state.'
+          : 'The group changed. Reload to see the latest state.');
       } else if (failure instanceof GroupHttpError && failure.code === 'last_admin') {
         setError('A group must keep at least one active Admin.');
       } else if (failure instanceof GroupHttpError && failure.code === 'forbidden') {

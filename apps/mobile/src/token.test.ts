@@ -14,7 +14,7 @@ test('reads the app-scoped subject from a token payload', () => {
 });
 
 test('round-trips the development token subject without Node or DOM globals', () => {
-  assert.equal(readAppSubject(createDevAccessToken()), 'aps_dev_0123456789012345');
+  assert.equal(readAppSubject(createDevAccessToken()), 'aps_dev_0123456789012345678901');
   assert.equal(readAppSubject(createDevAccessToken('aps_custom')), 'aps_custom');
 });
 

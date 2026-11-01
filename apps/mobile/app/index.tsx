@@ -8,17 +8,28 @@ import { screenFor } from '../src/app-screen';
 import { sessionStore } from '../src/expo-session-store';
 import { loadMobileAuthorizationRequest } from '../src/oauth-client';
 import { validateAuthorizationRedirect } from '../src/oauth-redirect';
-import { fetchMemberProfile, fetchProfileState, type ProfileStateResult } from '../src/profile-client';
+import {
+  ProfileContractError,
+  ProfileHttpError,
+  fetchMemberProfile,
+  fetchProfileState,
+  type ProfileStateResult
+} from '../src/profile-client';
 import { initialSessionState, reduceSessionState, type SessionState } from '../src/session-state';
 import { createDevAccessToken, readAppSubject } from '../src/token';
 
 const config = createAppConfig(process.env);
 const BOOTING: SessionState = { kind: 'booting', ledgerAvailable: false };
+const DEV = process.env.NODE_ENV !== 'production';
+
+type Failure = { kind: 'offline' | 'contract'; message: string };
 
 export default function HomeScreen() {
   const [session, setSession] = useState<SessionState>(BOOTING);
   const [profile, setProfile] = useState<ProfileStateResult>();
   const [online, setOnline] = useState(true);
+  const [memberPending, setMemberPending] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const accessToken = useRef<string | null>(null);
@@ -27,27 +38,53 @@ export default function HomeScreen() {
     setSession((current) => reduceSessionState(current, event));
   }, []);
 
+  const expireSession = useCallback(async (reason: string) => {
+    await sessionStore.wipe();
+    accessToken.current = null;
+    setProfile(undefined);
+    setMemberPending(false);
+    setFailure(null);
+    setOnline(true);
+    setSession(initialSessionState);
+    setMessage(reason);
+  }, []);
+
   const checkProfile = useCallback(async (token: string) => {
     const subject = readAppSubject(token);
     try {
       const state = await fetchProfileState(config.apiBaseUrl, token);
       setOnline(true);
+      setFailure(null);
       setProfile(state);
       if (state.state !== 'PROFILE_READY') {
+        setMemberPending(false);
         return;
       }
       const member = await fetchMemberProfile(config.apiBaseUrl, token);
-      if (member) {
-        setSession((current) => reduceSessionState(current, {
-          type: 'memberProfileReady',
-          identityId: subject,
-          memberId: member.memberId
-        }));
+      if (!member) {
+        setMemberPending(true);
+        return;
       }
-    } catch {
+      setMemberPending(false);
+      setSession((current) => reduceSessionState(current, {
+        type: 'memberProfileReady',
+        identityId: subject,
+        memberId: member.memberId
+      }));
+    } catch (error) {
+      if (error instanceof ProfileHttpError && (error.status === 401 || error.status === 403)) {
+        await expireSession('Your session expired. Sign in again.');
+        return;
+      }
+      if (error instanceof ProfileHttpError || error instanceof ProfileContractError) {
+        setOnline(true);
+        setFailure({ kind: 'contract', message: 'Dutch could not confirm your profile. Try again.' });
+        return;
+      }
       setOnline(false);
+      setFailure({ kind: 'offline', message: 'We could not reach Dutch.' });
     }
-  }, []);
+  }, [expireSession]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,15 +110,17 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (session.kind !== 'profileRequired' || !accessToken.current) return;
-    if (profile?.state === 'PROFILE_READY') return;
-    const delay = (profile?.retryAfterSeconds ?? 5) * 1000;
+    if (profile?.state === 'PROFILE_READY' && !memberPending) return;
+    const delay = memberPending ? 2 : (profile?.retryAfterSeconds ?? 5);
     const timer = setTimeout(() => {
       if (accessToken.current) void checkProfile(accessToken.current);
-    }, delay);
+    }, delay * 1000);
     return () => clearTimeout(timer);
-  }, [session.kind, profile, checkProfile]);
+  }, [session.kind, profile, memberPending, checkProfile]);
 
   const retry = useCallback(() => {
+    setFailure(null);
+    setMessage(null);
     if (accessToken.current) void checkProfile(accessToken.current);
   }, [checkProfile]);
 
@@ -92,6 +131,8 @@ export default function HomeScreen() {
     }
     setBusy(true);
     setMessage(null);
+    setFailure(null);
+    setMemberPending(false);
     try {
       const { request, redirectUri } = await loadMobileAuthorizationRequest(config.issuer);
       const discovery = await AuthSession.fetchDiscoveryAsync(config.issuer);
@@ -140,10 +181,15 @@ export default function HomeScreen() {
     await sessionStore.wipe();
     accessToken.current = null;
     setProfile(undefined);
+    setMemberPending(false);
+    setFailure(null);
+    setOnline(true);
+    setMessage(null);
     apply({ type: 'logoutCompleted' });
   }, [apply]);
 
   const startDevSession = useCallback(async () => {
+    if (!DEV || !config.devSession) return;
     const token = createDevAccessToken();
     const subject = readAppSubject(token);
     await sessionStore.save({ accessToken: token, refreshToken: '', identityId: subject });
@@ -154,6 +200,7 @@ export default function HomeScreen() {
   }, [checkProfile]);
 
   const screen = screenFor({ session, profile, online });
+  const contractFailure = failure?.kind === 'contract' && session.kind === 'profileRequired';
 
   return (
     <View style={styles.screen}>
@@ -164,11 +211,11 @@ export default function HomeScreen() {
           busy={busy}
           message={message}
           onSignIn={signIn}
-          devSession={config.devSession}
+          devSession={DEV && config.devSession}
           onDevSession={startDevSession}
         />
       ) : null}
-      {screen === 'profileRequired' ? (
+      {!contractFailure && screen === 'profileRequired' ? (
         <ProfileRequired
           retryAfter={profile?.retryAfterSeconds}
           message={message}
@@ -177,7 +224,12 @@ export default function HomeScreen() {
         />
       ) : null}
       {screen === 'profiling' ? <Loading label="Finishing your profile" /> : null}
-      {screen === 'offline' ? <Offline message={message} onRetry={retry} /> : null}
+      {screen === 'offline' ? (
+        <Offline message={failure?.message ?? message} onRetry={retry} onSignOut={signOut} />
+      ) : null}
+      {contractFailure ? (
+        <Unavailable message={failure?.message ?? null} onRetry={retry} onSignOut={signOut} />
+      ) : null}
       {screen === 'home' && session.kind === 'authenticated' ? (
         <Home memberId={session.memberId} ledgerAvailable={session.ledgerAvailable} onSignOut={signOut} />
       ) : null}
@@ -257,7 +309,15 @@ function ProfileRequired({
   );
 }
 
-function Offline({ message, onRetry }: { message: string | null; onRetry: () => void }) {
+function Offline({
+  message,
+  onRetry,
+  onSignOut
+}: {
+  message: string | null;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
   return (
     <View style={styles.centered}>
       <Text style={styles.eyebrow}>Offline</Text>
@@ -268,6 +328,36 @@ function Offline({ message, onRetry }: { message: string | null; onRetry: () => 
       {message ? <Text style={styles.notice}>{message}</Text> : null}
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.primary}>
         <Text style={styles.primaryLabel}>Try again</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.quiet}>
+        <Text style={styles.quietLabel}>Sign out</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function Unavailable({
+  message,
+  onRetry,
+  onSignOut
+}: {
+  message: string | null;
+  onRetry: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <View style={styles.centered}>
+      <Text style={styles.eyebrow}>Not confirmed</Text>
+      <Text style={styles.title}>Your profile is not ready.</Text>
+      <Text style={styles.body}>
+        Dutch could not confirm your Member Profile. Balances stay locked until it can.
+      </Text>
+      {message ? <Text style={styles.notice}>{message}</Text> : null}
+      <Pressable accessibilityRole="button" onPress={onRetry} style={styles.primary}>
+        <Text style={styles.primaryLabel}>Try again</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={onSignOut} style={styles.quiet}>
+        <Text style={styles.quietLabel}>Sign out</Text>
       </Pressable>
     </View>
   );

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   ProfileContractError,
+  ProfileHttpError,
   fetchMemberProfile,
   fetchProfileState,
   parseMemberProfile,
@@ -20,12 +21,16 @@ test('keeps a positive bounded retry hint and rejects any other value', () => {
     state: 'PROFILE_REQUIRED',
     retryAfterSeconds: 5
   });
-  for (const retryAfterSeconds of [0, -1, 1.5, '5']) {
+  for (const retryAfterSeconds of [0, -1, 1.5, '5', 3601]) {
     assert.throws(
       () => parseProfileState({ data: { state: 'PROFILE_REQUIRED', retryAfterSeconds } }),
       ProfileContractError
     );
   }
+  assert.deepEqual(parseProfileState({ data: { state: 'PROFILE_REQUIRED', retryAfterSeconds: 3600 } }), {
+    state: 'PROFILE_REQUIRED',
+    retryAfterSeconds: 3600
+  });
 });
 
 test('fails closed on an unknown or missing profile state', () => {
@@ -55,6 +60,18 @@ test('parses only the closed member profile fields', () => {
     () => parseMemberProfile({ data: { memberId: '', displayName: null, profileState: 'PROFILE_READY', lifecycleState: 'ACTIVE' } }),
     ProfileContractError
   );
+  assert.throws(
+    () => parseMemberProfile({ data: { memberId: 'mem_012345678901234567', displayName: null, profileState: 'PROFILE_PROVISIONING', lifecycleState: 'ACTIVE' } }),
+    ProfileContractError
+  );
+  assert.throws(
+    () => parseMemberProfile({ data: { memberId: 'mem_012345678901234567', displayName: null, profileState: 'PROFILE_READY', lifecycleState: 'SUSPENDED' } }),
+    ProfileContractError
+  );
+  assert.throws(
+    () => parseMemberProfile({ data: { memberId: 'usr_012345678901234567', displayName: null, profileState: 'PROFILE_READY', lifecycleState: 'ACTIVE' } }),
+    ProfileContractError
+  );
 });
 
 test('requests profile state with the bearer token and parses the answer', async () => {
@@ -75,9 +92,16 @@ test('treats a 409 member-profile response as profile-required rather than an er
   assert.equal(profile, null);
 });
 
-test('rejects a failed profile request', async () => {
+test('surfaces an authentication failure as an HTTP error', async () => {
+  await assert.rejects(
+    fetchProfileState('https://api.example.test', 'token', async () => new Response('', { status: 401 })),
+    (error: unknown) => error instanceof ProfileHttpError && error.status === 401
+  );
+});
+
+test('surfaces an unavailable service as an HTTP error', async () => {
   await assert.rejects(
     fetchProfileState('https://api.example.test', 'token', async () => new Response('', { status: 503 })),
-    ProfileContractError
+    (error: unknown) => error instanceof ProfileHttpError && error.status === 503
   );
 });

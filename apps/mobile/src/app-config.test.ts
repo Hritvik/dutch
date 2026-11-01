@@ -23,6 +23,22 @@ test('rejects a base URL with a query or fragment', () => {
   assert.throws(() => createAppConfig({ EXPO_PUBLIC_DUTCH_API_URL: 'https://api.example.test#top' }));
 });
 
+test('requires HTTPS outside a local development host', () => {
+  assert.throws(() => createAppConfig({ EXPO_PUBLIC_DUTCH_API_URL: 'http://api.example.test' }));
+  assert.equal(
+    createAppConfig({ EXPO_PUBLIC_DUTCH_API_URL: 'http://127.0.0.1:4010' }).apiBaseUrl,
+    'http://127.0.0.1:4010'
+  );
+  assert.equal(
+    createAppConfig({ EXPO_PUBLIC_DUTCH_API_URL: 'http://10.0.2.2:4010' }).apiBaseUrl,
+    'http://10.0.2.2:4010'
+  );
+});
+
+test('rejects embedded credentials', () => {
+  assert.throws(() => createAppConfig({ EXPO_PUBLIC_DUTCH_API_URL: 'https://user:pass@api.example.test' }));
+});
+
 test('keeps an explicit issuer for the PKCE request', () => {
   assert.equal(
     createAppConfig({ EXPO_PUBLIC_IAM_ISSUER: 'https://iam.example.test' }).issuer,

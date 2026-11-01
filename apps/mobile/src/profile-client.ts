@@ -20,6 +20,13 @@ export class ProfileContractError extends Error {
   }
 }
 
+export class ProfileHttpError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'ProfileHttpError';
+  }
+}
+
 export type ApiFetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,8 +49,8 @@ export function parseProfileState(payload: unknown): ProfileStateResult {
   if (retry === undefined) {
     return { state };
   }
-  if (typeof retry !== 'number' || !Number.isInteger(retry) || retry <= 0) {
-    throw new ProfileContractError('retryAfterSeconds must be a positive integer.');
+  if (typeof retry !== 'number' || !Number.isInteger(retry) || retry <= 0 || retry > 3600) {
+    throw new ProfileContractError('retryAfterSeconds must be a positive integer no greater than 3600.');
   }
   return { state, retryAfterSeconds: retry };
 }
@@ -53,19 +60,22 @@ export function parseMemberProfile(payload: unknown): MemberProfile {
     throw new ProfileContractError('Member profile response is missing data.');
   }
   const { memberId, displayName, profileState, lifecycleState } = payload.data;
-  if (typeof memberId !== 'string' || memberId.length === 0) {
-    throw new ProfileContractError('memberId is required.');
+  if (typeof memberId !== 'string' || !/^mem_[A-Za-z0-9_-]{16,128}$/.test(memberId)) {
+    throw new ProfileContractError('memberId does not match the pinned format.');
   }
   if (displayName !== null && typeof displayName !== 'string') {
     throw new ProfileContractError('displayName must be a string or null.');
   }
-  if (typeof lifecycleState !== 'string' || lifecycleState.length === 0) {
-    throw new ProfileContractError('lifecycleState is required.');
+  if (parseState(profileState) !== 'PROFILE_READY') {
+    throw new ProfileContractError('The profile resource must return PROFILE_READY.');
+  }
+  if (lifecycleState !== 'ACTIVE') {
+    throw new ProfileContractError('Only an ACTIVE member may reach the shell.');
   }
   return {
     memberId,
     displayName,
-    profileState: parseState(profileState),
+    profileState: 'PROFILE_READY',
     lifecycleState
   };
 }
@@ -91,7 +101,7 @@ export async function fetchProfileState(
 ): Promise<ProfileStateResult> {
   const response = await authorizedGet(apiUrl(baseUrl, '/api/v1/me/profile-state'), accessToken, fetchImpl);
   if (!response.ok) {
-    throw new ProfileContractError(`Profile state request failed with ${response.status}.`);
+    throw new ProfileHttpError(response.status, `Profile state request failed with ${response.status}.`);
   }
   return parseProfileState(await response.json());
 }
@@ -106,7 +116,7 @@ export async function fetchMemberProfile(
     return null;
   }
   if (!response.ok) {
-    throw new ProfileContractError(`Member profile request failed with ${response.status}.`);
+    throw new ProfileHttpError(response.status, `Member profile request failed with ${response.status}.`);
   }
   return parseMemberProfile(await response.json());
 }

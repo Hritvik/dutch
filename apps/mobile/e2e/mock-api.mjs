@@ -49,6 +49,6 @@ const server = createServer((request, response) => {
   json(response, 404, { error: { code: 'not_found', message: 'Unknown mock route.' } });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Dutch mock API listening on http://0.0.0.0:${PORT}`);
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`Dutch mock API listening on http://127.0.0.1:${PORT}`);
 });

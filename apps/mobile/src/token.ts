@@ -31,7 +31,7 @@ export function readAppSubject(accessToken: string): string {
  * never accepted by a resource server: the mock API ignores signatures and
  * production builds do not enable the dev session.
  */
-export function createDevAccessToken(subject = 'aps_dev_0123456789012345'): string {
+export function createDevAccessToken(subject = 'aps_dev_0123456789012345678901'): string {
   return `${encodeBase64Url(JSON.stringify({ alg: 'none', typ: 'JWT' }))}.${encodeBase64Url(
     JSON.stringify({ sub: subject })
   )}.`;

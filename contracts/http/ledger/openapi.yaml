@@ -12,19 +12,19 @@ paths:
       security:
         - bearerAuth: []
       responses:
-        '200':
+        "200":
           description: Groups the caller can read.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '503':
-          $ref: '#/components/responses/Unavailable'
+                $ref: "#/components/schemas/GroupListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/Unavailable"
     post:
       operationId: createGroup
       security:
@@ -34,186 +34,192 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateGroupRequest'
+              $ref: "#/components/schemas/CreateGroupRequest"
       responses:
-        '200':
+        "200":
           description: The created group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '400':
-          $ref: '#/components/responses/Invalid'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '503':
-          $ref: '#/components/responses/Unavailable'
+                $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/groups/{groupId}:
     get:
       operationId: getGroup
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
+        - $ref: "#/components/parameters/GroupId"
       responses:
-        '200':
+        "200":
           description: The readable group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/v1/groups/{groupId}/members:
     post:
       operationId: addMember
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MembershipRequest'
+              $ref: "#/components/schemas/MembershipRequest"
       responses:
-        '200':
+        "200":
           description: The updated group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '400':
-          $ref: '#/components/responses/Invalid'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/GroupResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/v1/groups/{groupId}/members/{memberId}:
     patch:
       operationId: changeMemberRole
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
-        - $ref: '#/components/parameters/MemberId'
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/MemberId"
+        - $ref: "#/components/parameters/IfMatch"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RoleRequest'
+              $ref: "#/components/schemas/RoleRequest"
       responses:
-        '200':
+        "200":
           description: The updated group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
     delete:
       operationId: deactivateMember
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
-        - $ref: '#/components/parameters/MemberId'
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/MemberId"
+        - $ref: "#/components/parameters/IfMatch"
       responses:
-        '200':
+        "200":
           description: The updated group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/v1/groups/{groupId}/members/{memberId}/activate:
     post:
       operationId: activateMember
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
-        - $ref: '#/components/parameters/MemberId'
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/MemberId"
+        - $ref: "#/components/parameters/IfMatch"
       responses:
-        '200':
+        "200":
           description: The updated group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/v1/groups/{groupId}/archive:
     post:
       operationId: archiveGroup
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/IfMatch"
       responses:
-        '200':
+        "200":
           description: The archived group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/v1/groups/{groupId}/reopen:
     post:
       operationId: reopenGroup
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/GroupId'
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/IfMatch"
       responses:
-        '200':
+        "200":
           description: The reopened group.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GroupResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
+                $ref: "#/components/schemas/GroupResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
 components:
   securitySchemes:
     bearerAuth:
@@ -226,100 +232,125 @@ components:
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/GroupId'
+        $ref: "#/components/schemas/GroupId"
     MemberId:
       name: memberId
       in: path
       required: true
       schema:
-        $ref: '#/components/schemas/MemberId'
+        $ref: "#/components/schemas/MemberId"
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Expected aggregate version; a mismatch returns 409 conflict.
+      schema:
+        type: string
+        pattern: ^"?[0-9]+"?$
   headers:
     CorrelationId:
       description: Correlation identifier echoed by the service.
       required: true
       schema:
         type: string
-        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+        pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$
   responses:
     Unauthorized:
       description: Authentication is required.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     Forbidden:
       description: Access is denied.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: The scope is unavailable.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     Invalid:
       description: The request is invalid.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     Conflict:
       description: The request conflicts with the current group state.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     Unavailable:
       description: The service is temporarily unavailable.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
   schemas:
     GroupId:
       type: string
-      pattern: '^grp_[A-Za-z0-9_-]{16,128}$'
+      pattern: ^grp_[A-Za-z0-9_-]{16,128}$
     MemberId:
       type: string
-      pattern: '^mem_[A-Za-z0-9_-]{16,128}$'
+      pattern: ^mem_[A-Za-z0-9_-]{16,128}$
     GroupRole:
       type: string
-      enum: [ADMIN, MEMBER]
+      enum:
+        - ADMIN
+        - MEMBER
     MembershipState:
       type: string
-      enum: [INVITED, PLACEHOLDER, ACTIVE, INACTIVE]
+      enum:
+        - INVITED
+        - PLACEHOLDER
+        - ACTIVE
+        - INACTIVE
     GroupState:
       type: string
-      enum: [ACTIVE, ARCHIVED]
+      enum:
+        - ACTIVE
+        - ARCHIVED
     MembershipView:
       type: object
       additionalProperties: false
-      required: [memberId, role, state]
+      required:
+        - memberId
+        - role
+        - state
       properties:
         memberId:
-          $ref: '#/components/schemas/MemberId'
+          $ref: "#/components/schemas/MemberId"
         role:
-          $ref: '#/components/schemas/GroupRole'
+          $ref: "#/components/schemas/GroupRole"
         state:
-          $ref: '#/components/schemas/MembershipState'
+          $ref: "#/components/schemas/MembershipState"
     GroupView:
       type: object
       additionalProperties: false
-      required: [id, name, currency, state, version, memberships]
+      required:
+        - id
+        - name
+        - currency
+        - state
+        - version
+        - memberships
       properties:
         id:
-          $ref: '#/components/schemas/GroupId'
+          $ref: "#/components/schemas/GroupId"
         name:
           type: string
           minLength: 1
           maxLength: 120
         currency:
           type: string
-          pattern: '^[A-Z]{3}$'
+          pattern: ^[A-Z]{3}$
         state:
-          $ref: '#/components/schemas/GroupState'
+          $ref: "#/components/schemas/GroupState"
         version:
           type: integer
           minimum: 0
@@ -327,28 +358,32 @@ components:
           type: array
           maxItems: 10000
           items:
-            $ref: '#/components/schemas/MembershipView'
+            $ref: "#/components/schemas/MembershipView"
     GroupResponse:
       type: object
       additionalProperties: false
-      required: [data]
+      required:
+        - data
       properties:
         data:
-          $ref: '#/components/schemas/GroupView'
+          $ref: "#/components/schemas/GroupView"
     GroupListResponse:
       type: object
       additionalProperties: false
-      required: [data]
+      required:
+        - data
       properties:
         data:
           type: array
           maxItems: 1000
           items:
-            $ref: '#/components/schemas/GroupView'
+            $ref: "#/components/schemas/GroupView"
     CreateGroupRequest:
       type: object
       additionalProperties: false
-      required: [name, currency]
+      required:
+        - name
+        - currency
       properties:
         name:
           type: string
@@ -356,38 +391,51 @@ components:
           maxLength: 120
         currency:
           type: string
-          pattern: '^[A-Z]{3}$'
+          pattern: ^[A-Z]{3}$
     MembershipRequest:
       type: object
       additionalProperties: false
-      required: [memberId, role]
+      required:
+        - memberId
+        - role
       properties:
         memberId:
-          $ref: '#/components/schemas/MemberId'
+          $ref: "#/components/schemas/MemberId"
         role:
-          $ref: '#/components/schemas/GroupRole'
+          $ref: "#/components/schemas/GroupRole"
         placeholder:
           type: boolean
     RoleRequest:
       type: object
       additionalProperties: false
-      required: [role]
+      required:
+        - role
       properties:
         role:
-          $ref: '#/components/schemas/GroupRole'
+          $ref: "#/components/schemas/GroupRole"
     ErrorResponse:
       type: object
       additionalProperties: false
-      required: [error]
+      required:
+        - error
       properties:
         error:
           type: object
           additionalProperties: false
-          required: [code, message, correlationId]
+          required:
+            - code
+            - message
+            - correlationId
           properties:
             code:
               type: string
-              enum: [invalid_request, unauthorized, forbidden, not_found, conflict, service_unavailable]
+              enum:
+                - invalid_request
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - service_unavailable
             message:
               type: string
               enum:
@@ -399,4 +447,4 @@ components:
                 - Service is temporarily unavailable
             correlationId:
               type: string
-              pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$

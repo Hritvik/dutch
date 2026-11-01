@@ -33,71 +33,78 @@ public class GroupService {
         return requireReadable(member, groupId).view();
     }
 
-    public GroupView invite(String appSubject, String groupId, String invitee, GroupRole role) {
+    public GroupView invite(String appSubject, String groupId, String invitee, GroupRole role, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.invite(actor, new MemberId(invitee), role, Instant.now());
         groups.save(group, expected);
         return group.view();
     }
 
-    public GroupView addPlaceholder(String appSubject, String groupId, String placeholder, GroupRole role) {
+    public GroupView addPlaceholder(String appSubject, String groupId, String placeholder, GroupRole role, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.addPlaceholder(actor, new MemberId(placeholder), role, Instant.now());
         groups.save(group, expected);
         return group.view();
     }
 
-    public GroupView activate(String appSubject, String groupId, String memberId) {
+    public GroupView activate(String appSubject, String groupId, String memberId, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         MemberId target = new MemberId(memberId);
         Group group = requireGroup(groupId);
         if (!actor.equals(target)) {
             requireAdmin(actor, group);
         }
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.activate(actor, target, Instant.now());
         groups.save(group, expected);
         return group.view();
     }
 
-    public GroupView deactivate(String appSubject, String groupId, String memberId) {
+    public GroupView deactivate(String appSubject, String groupId, String memberId, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         MemberId target = new MemberId(memberId);
         Group group = requireReadable(actor, groupId);
         if (!actor.equals(target)) {
             requireAdmin(actor, group);
         }
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.deactivate(actor, target, Instant.now());
         groups.save(group, expected);
         return group.view();
     }
 
-    public GroupView changeRole(String appSubject, String groupId, String memberId, GroupRole role) {
+    public GroupView changeRole(String appSubject, String groupId, String memberId, GroupRole role, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.changeRole(actor, new MemberId(memberId), role, Instant.now());
         groups.save(group, expected);
         return group.view();
     }
 
-    public GroupView archive(String appSubject, String groupId) {
+    public GroupView archive(String appSubject, String groupId, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.archive(actor, Instant.now());
         groups.save(group, expected);
         return group.view();
     }
 
-    public GroupView reopen(String appSubject, String groupId) {
+    public GroupView reopen(String appSubject, String groupId, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        requireVersion(group, expectedVersion);
         long expected = group.version();
         group.reopen(actor, Instant.now());
         groups.save(group, expected);
@@ -131,6 +138,12 @@ public class GroupService {
             throw new GroupForbiddenException();
         }
         return group;
+    }
+
+    private static void requireVersion(Group group, Long expectedVersion) {
+        if (expectedVersion != null && expectedVersion != group.version()) {
+            throw new ConcurrentGroupUpdateException();
+        }
     }
 
     private static GroupId newGroupId() {

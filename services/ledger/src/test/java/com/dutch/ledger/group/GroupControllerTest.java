@@ -151,6 +151,44 @@ class GroupControllerTest {
     }
 
     @Test
+    void rejects_a_stale_if_match_and_accepts_the_current_version() throws Exception {
+        String groupId = createGroup();
+        String first = "mem_312345678901234567";
+        String second = "mem_412345678901234567";
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + first + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + second + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("conflict"));
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + second + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void rejects_an_invalid_if_match() throws Exception {
+        String groupId = createGroup();
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "not-a-version")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"mem_312345678901234567\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
     void rejects_invalid_group_input() throws Exception {
         mockMvc.perform(post("/api/v1/groups").with(as(ADMIN_SUBJECT))
                         .contentType(MediaType.APPLICATION_JSON)

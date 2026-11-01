@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "profile_required",
+    "message": "Complete your profile to continue.",
+    "correlationId": "cor_0123456789012345"
+  }
+}

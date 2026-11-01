@@ -1,0 +1,18 @@
+asyncapi: 3.0.0
+info:
+  title: Dutch internal events
+  version: 2.0.0
+  description: Dutch-owned member mapping fact inside the pinned IAM event envelope. The legacy
+    iam.identity.verified.v1 and ums.member.mapping.changed.v1 channels are retired.
+channels:
+  dutch.member-profile.mapping-changed.v1:
+    address: dutch.member-profile.mapping-changed.v1
+    messages:
+      memberProfileMappingChanged:
+        payload:
+          $ref: './dutch/json-schema/dutch.member-profile.mapping-changed.v1.schema.json'
+operations:
+  publishMemberProfileMappingChanged:
+    action: send
+    channel:
+      $ref: '#/channels/dutch.member-profile.mapping-changed.v1'

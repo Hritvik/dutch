@@ -1,0 +1,110 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { parse } from 'yaml';
+
+import {
+  findProtectedHttpValues,
+  findSensitiveValues,
+  validateContracts,
+  validateEventFixture,
+  validateHttpFixture
+} from '../validate-contracts.mjs';
+
+const contractsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+test('validates the published Dutch mapping and profile fixtures', async () => {
+  const result = await validateContracts(contractsRoot);
+  assert.deepEqual(result, { valid: true, issues: [] });
+});
+
+test('rejects a fixture that no longer matches the published success envelope', async () => {
+  const fixture = JSON.parse(await readFile(
+    path.join(contractsRoot, 'http/fixtures/success/health-ready.json'), 'utf8'));
+  delete fixture.data.status;
+  const result = await validateHttpFixture(contractsRoot, 'HealthResponse', fixture);
+  assert.equal(result.valid, false);
+  assert.match(result.issues[0], /status/);
+});
+
+test('rejects a mapping event carrying a global identity', async () => {
+  const fixture = JSON.parse(await readFile(
+    path.join(contractsRoot, 'events/fixtures/dutch/forbidden-identity.json'), 'utf8'));
+  const result = await validateEventFixture(
+    contractsRoot, 'dutch.member-profile.mapping-changed.v1', fixture);
+  assert.equal(result.valid, false);
+  assert.match(result.issues.join('\n'), /additional properties/i);
+});
+
+test('rejects a mapping event whose envelope disagrees with its payload', async () => {
+  const fixture = JSON.parse(await readFile(
+    path.join(contractsRoot, 'events/fixtures/dutch/member-profile-mapping-changed.json'), 'utf8'));
+  fixture.destination.appRegistrationId = 'another-app';
+  const result = await validateEventFixture(
+    contractsRoot, 'dutch.member-profile.mapping-changed.v1', fixture);
+  assert.equal(result.valid, false);
+  assert.match(result.issues.join('\n'), /destination\.appRegistrationId/);
+});
+
+test('validates profile-state and profile-ready responses', async () => {
+  for (const [file, schema] of [
+    ['http/fixtures/success/profile-state-required.json', 'ProfileStateResponse'],
+    ['http/fixtures/success/profile-state-ready.json', 'ProfileStateResponse'],
+    ['http/fixtures/success/profile-ready.json', 'ProfileReadyResponse']
+  ]) {
+    const fixture = JSON.parse(await readFile(path.join(contractsRoot, file), 'utf8'));
+    assert.deepEqual(await validateHttpFixture(contractsRoot, schema, fixture),
+      { valid: true, issues: [] });
+  }
+});
+
+test('rejects token fields and token-shaped values in any published fixture', () => {
+  const violations = findSensitiveValues({
+    access_token: 'header.payload.signature',
+    nested: { authorization: 'Bearer eyJhbGciOiJSUzI1NiJ9.payload.signature' }
+  });
+  assert.equal(violations.length, 3);
+  assert.match(violations.join('\n'), /access_token.*forbidden field name/i);
+  assert.match(violations.join('\n'), /authorization.*forbidden field name/i);
+  assert.match(violations.join('\n'), /token-like value/i);
+});
+
+test('rejects an App Subject or global identity in an HTTP response', () => {
+  const violations = findProtectedHttpValues({
+    data: { appSubject: 'aps_0123456789012345678901ab', identityId: 'hid_0123456789012345678901' }
+  });
+  assert.equal(violations.length, 2);
+  assert.match(violations.join('\n'), /App Subject/);
+  assert.match(violations.join('\n'), /Human Identity ID/);
+});
+
+test('the 409 body is pinned to profile_required', async () => {
+  const required = JSON.parse(await readFile(
+    path.join(contractsRoot, 'http/fixtures/error/profile-required.json'), 'utf8'));
+  assert.deepEqual(
+    await validateHttpFixture(contractsRoot, 'ProfileRequiredResponse', required),
+    { valid: true, issues: [] });
+  const other = structuredClone(required);
+  other.error.code = 'not_found';
+  other.error.message = 'Resource was not found';
+  const result = await validateHttpFixture(contractsRoot, 'ProfileRequiredResponse', other);
+  assert.equal(result.valid, false);
+});
+
+test('publishes only the Dutch mapping channel', async () => {
+  const asyncapi = parse(await readFile(
+    path.join(contractsRoot, 'events/asyncapi.yaml'), 'utf8'));
+  assert.deepEqual(Object.keys(asyncapi.channels), ['dutch.member-profile.mapping-changed.v1']);
+  assert.equal(asyncapi.info.version, '2.0.0');
+});
+
+test('requires bearer JWT authentication on both profile routes', async () => {
+  const openApi = parse(await readFile(
+    path.join(contractsRoot, 'http/gateway/openapi.yaml'), 'utf8'));
+  assert.deepEqual(openApi.paths['/api/v1/me'].get.security, [{ bearerAuth: [] }]);
+  assert.deepEqual(openApi.paths['/api/v1/me/profile-state'].get.security, [{ bearerAuth: [] }]);
+  assert.equal(openApi.paths['/api/v1/me'].get.responses['409'].content['application/json']
+    .schema.$ref, '#/components/schemas/ProfileRequiredResponse');
+});

@@ -80,14 +80,15 @@ export function findProtectedHttpValues(value, location = '$') {
   return [];
 }
 
-async function loadOpenApi(contractsRoot) {
-  const openApiPath = path.join(contractsRoot, 'http/gateway/openapi.yaml');
+async function loadOpenApi(contractsRoot, relative = 'http/gateway/openapi.yaml') {
+  const openApiPath = path.join(contractsRoot, relative);
   await SwaggerParser.validate(openApiPath);
-  return readYaml(openApiPath);
+  return SwaggerParser.dereference(openApiPath);
 }
 
-export async function validateHttpFixture(contractsRoot, schemaName, fixture) {
-  const openApi = await loadOpenApi(contractsRoot);
+export async function validateHttpFixture(
+  contractsRoot, schemaName, fixture, relative = 'http/gateway/openapi.yaml') {
+  const openApi = await loadOpenApi(contractsRoot, relative);
   const schema = openApi.components?.schemas?.[schemaName];
   if (!schema) {
     return { valid: false, issues: [`Published schema ${schemaName} was not found.`] };
@@ -138,14 +139,20 @@ const httpFixtures = [
   ['service-unavailable', 'ErrorResponse', 'http/fixtures/error/service-unavailable.json'],
   ['profile-state-required', 'ProfileStateResponse', 'http/fixtures/success/profile-state-required.json'],
   ['profile-state-ready', 'ProfileStateResponse', 'http/fixtures/success/profile-state-ready.json'],
-  ['profile-ready', 'ProfileReadyResponse', 'http/fixtures/success/profile-ready.json']
+  ['profile-ready', 'ProfileReadyResponse', 'http/fixtures/success/profile-ready.json'],
+  ['ledger-group-view', 'GroupResponse', 'http/fixtures/ledger/group-view.json', 'http/ledger/openapi.yaml'],
+  ['ledger-group-list', 'GroupListResponse', 'http/fixtures/ledger/group-list.json', 'http/ledger/openapi.yaml'],
+  ['ledger-create-group', 'CreateGroupRequest', 'http/fixtures/ledger/create-group-request.json', 'http/ledger/openapi.yaml'],
+  ['ledger-membership', 'MembershipRequest', 'http/fixtures/ledger/membership-request.json', 'http/ledger/openapi.yaml'],
+  ['ledger-role', 'RoleRequest', 'http/fixtures/ledger/role-request.json', 'http/ledger/openapi.yaml'],
+  ['ledger-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-conflict.json', 'http/ledger/openapi.yaml']
 ];
 
 export async function validateContracts(contractsRoot, overrides = {}) {
   const issues = [];
-  for (const [label, schemaName, relative] of httpFixtures) {
+  for (const [label, schemaName, relative, contract] of httpFixtures) {
     const fixture = await readJson(path.join(contractsRoot, relative));
-    const result = await validateHttpFixture(contractsRoot, schemaName, fixture);
+    const result = await validateHttpFixture(contractsRoot, schemaName, fixture, contract);
     issues.push(...result.issues.map((issue) => `HTTP fixture ${label}: ${issue}`));
     issues.push(...findSensitiveValues(fixture).map((issue) => `HTTP fixture ${label}: ${issue}`));
     issues.push(...findProtectedHttpValues(fixture).map((issue) => `HTTP fixture ${label}: ${issue}`));

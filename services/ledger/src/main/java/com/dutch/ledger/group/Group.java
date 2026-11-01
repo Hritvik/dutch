@@ -51,6 +51,20 @@ public final class Group {
         return new Group(id, validatedName, validatedCurrency, GroupState.ACTIVE, Map.of(creator, admin), 0);
     }
 
+    /** Rehydrates a persisted group. Invariants are re-checked on load, never trusted blindly. */
+    public static Group restore(GroupId id, String name, String currency, GroupState state,
+                                 long version, List<Membership> memberships) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(memberships, "memberships");
+        Map<MemberId, Membership> map = new LinkedHashMap<>();
+        for (Membership membership : memberships) {
+            map.put(membership.memberId(), membership);
+        }
+        ensureActiveAdmin(map);
+        return new Group(id, validateName(name), validateCurrency(currency), state, map, version);
+    }
+
     public void invite(MemberId actor, MemberId invitee, GroupRole role, Instant now) {
         requireManager(actor);
         Objects.requireNonNull(invitee, "invitee");

@@ -113,6 +113,15 @@ class GatewayRoutingTest {
 
     @Test
     @WithMockUser
+    void routes_the_group_surface_to_the_ledger_service() throws Exception {
+        mockMvc.perform(get("/api/v1/groups"))
+                .andExpect(status().isOk());
+
+        assertThat(LEDGER.lastPath.get()).isEqualTo("/api/v1/groups");
+    }
+
+    @Test
+    @WithMockUser
     void regenerates_an_unsafe_correlation_id_and_keeps_the_body_valid() throws Exception {
         mockMvc.perform(get("/api/v1/me").header(CorrelationId.HEADER, "bad\"value"))
                 .andExpect(status().isOk())

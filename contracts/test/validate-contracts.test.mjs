@@ -108,3 +108,23 @@ test('requires bearer JWT authentication on both profile routes', async () => {
   assert.equal(openApi.paths['/api/v1/me'].get.responses['409'].content['application/json']
     .schema.$ref, '#/components/schemas/ProfileRequiredResponse');
 });
+
+test('rejects an unknown group role in the Ledger contract', async () => {
+  const fixture = JSON.parse(await readFile(
+    path.join(contractsRoot, 'http/fixtures/ledger/group-view.json'), 'utf8'));
+  fixture.data.memberships[0].role = 'OWNER';
+  const result = await validateHttpFixture(
+    contractsRoot, 'GroupResponse', fixture, 'http/ledger/openapi.yaml');
+  assert.equal(result.valid, false);
+  assert.match(result.issues.join('\n'), /role/);
+});
+
+test('requires bearer JWT authentication on every group route', async () => {
+  const openApi = parse(await readFile(
+    path.join(contractsRoot, 'http/ledger/openapi.yaml'), 'utf8'));
+  for (const [route, operations] of Object.entries(openApi.paths)) {
+    for (const [method, operation] of Object.entries(operations)) {
+      assert.deepEqual(operation.security, [{ bearerAuth: [] }], `${method} ${route}`);
+    }
+  }
+});

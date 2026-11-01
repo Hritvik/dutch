@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "id": "grp_012345678901234567",
+      "name": "Flat 12",
+      "currency": "INR",
+      "state": "ACTIVE",
+      "version": 1,
+      "memberships": [
+        { "memberId": "mem_012345678901234567", "role": "ADMIN", "state": "ACTIVE" }
+      ]
+    }
+  ]
+}

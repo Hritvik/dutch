@@ -3,6 +3,11 @@ spring:
     name: dutch-ledger
   flyway:
     locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${LEDGER_IAM_ISSUER_URI:}
 management:
   endpoints:
     web:

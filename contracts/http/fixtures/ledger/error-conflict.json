@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "conflict",
+    "message": "The request conflicts with the current group state",
+    "correlationId": "cor_0123456789012345"
+  }
+}

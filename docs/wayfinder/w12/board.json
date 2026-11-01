@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "revision": 0,
+  "project": "Dutch W-12 honest profile states",
+  "source_plan": "../../../docs/identity-platform/wayfinder/work-items.md#W-12",
+  "review_threshold": "medium",
+  "parent_status": "active",
+  "parent_acceptance_packet": "W12-F",
+  "repository_root_up": 3,
+  "lock_stale_after_seconds": 1800,
+  "claim_stale_after_seconds": 1800,
+  "execution_leases": {},
+  "packets": [
+    {
+      "id": "W12-A",
+      "title": "Serve profile state and the profile split",
+      "kind": "implementation",
+      "status": "ready",
+      "packet": "packets/W12-A.md",
+      "evidence": "evidence/W12-A.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "services/ums/src/main/java/com/dutch/ums/profile/ProfileStateController.java",
+        "services/ums/src/test/java/com/dutch/ums/profile/ProfileStateControllerTest.java"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": null,
+      "central": {
+        "task": "dutch-ref/W12-A",
+        "revision": 0,
+        "status": "ready",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W12-B",
+      "title": "Align correlation and errors with the pinned envelope",
+      "kind": "implementation",
+      "status": "ready",
+      "packet": "packets/W12-B.md",
+      "evidence": "evidence/W12-B.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "services/ums/src/main/java/com/dutch/ums/profile/CorrelationIdFilter.java",
+        "services/ums/src/main/java/com/dutch/ums/profile/ProfileErrorHandler.java",
+        "services/ums/src/main/java/com/dutch/ums/profile/UmsSecurityConfiguration.java"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": null,
+      "central": {
+        "task": "dutch-ref/W12-B",
+        "revision": 0,
+        "status": "ready",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W12-C",
+      "title": "Prove the profile journey end to end",
+      "kind": "integration",
+      "status": "draft",
+      "packet": "packets/W12-C.md",
+      "evidence": "evidence/W12-C.md",
+      "depends_on": [
+        "W12-A",
+        "W12-B"
+      ],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "services/ums/src/test/java/com/dutch/ums/profile/ProfileJourneyIntegrationTest.java",
+        "docs/wayfinder/w12/evidence/W12-C.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": null,
+      "central": {
+        "task": "dutch-ref/W12-C",
+        "revision": 0,
+        "status": "draft",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W12-R",
+      "title": "Independent contract and privacy review",
+      "kind": "review",
+      "status": "draft",
+      "packet": "packets/W12-R.md",
+      "evidence": "evidence/W12-R.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "docs/wayfinder/w12/evidence/W12-R.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": null,
+      "central": {
+        "task": "dutch-ref/W12-R",
+        "revision": 0,
+        "status": "draft",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W12-F",
+      "title": "Finalize accepted W-12 status",
+      "kind": "integration",
+      "status": "draft",
+      "packet": "packets/W12-F.md",
+      "evidence": "evidence/W12-F.md",
+      "depends_on": [
+        "W12-R"
+      ],
+      "dependency_gate": "accepted",
+      "write_paths": [
+        "docs/wayfinder/w12/README.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": null,
+      "central": {
+        "task": "dutch-ref/W12-F",
+        "revision": 0,
+        "status": "draft",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    }
+  ],
+  "central_registry": {
+    "home": "capabilities/work",
+    "board": "dutch.ref.w12",
+    "synced_at": "2026-11-01T00:00:00Z"
+  }
+}

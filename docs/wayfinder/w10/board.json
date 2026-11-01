@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "revision": 25,
+  "project": "Dutch W-10 mapping and profile contracts",
+  "source_plan": "../../../work-items.md#W-10",
+  "review_threshold": "medium",
+  "parent_status": "accepted",
+  "parent_acceptance_packet": "W10-F",
+  "repository_root_up": 3,
+  "lock_stale_after_seconds": 1800,
+  "claim_stale_after_seconds": 1800,
+  "execution_leases": {},
+  "packets": [
+    {
+      "id": "W10-A",
+      "title": "Pin the Dutch mapping event",
+      "kind": "implementation",
+      "status": "reviewed",
+      "packet": "packets/W10-A.md",
+      "evidence": "evidence/W10-A.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "contracts/events/asyncapi.yaml",
+        "contracts/events/dutch/json-schema/dutch.member-profile.mapping-changed.v1.schema.json",
+        "contracts/imported/iam/event-envelope.schema.json"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T01:54:08Z",
+        "summary": "Independent review accepted",
+        "next_action": "Promote dependent packets",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "implementation_agent": "OPENCODE-DS41F",
+      "reviews": [
+        {
+          "reviewer": "REVIEWER-13",
+          "decision": "approve",
+          "reviewed_at": "2026-10-31T01:54:08Z",
+          "evidence": "evidence/W10-A-review.md",
+          "evidence_sha256": "8af716c8c75b7b9c06151aa35184c11dbca8f94ef3dd43bb5cbc05dd3b8fdc9a"
+        }
+      ],
+      "central": {
+        "task": "dutch-ref/W10-A",
+        "revision": 0,
+        "status": "reviewed",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W10-B",
+      "title": "Pin the Dutch profile HTTP contract",
+      "kind": "implementation",
+      "status": "reviewed",
+      "packet": "packets/W10-B.md",
+      "evidence": "evidence/W10-B.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "contracts/http/gateway/openapi.yaml"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T01:54:08Z",
+        "summary": "Independent review accepted",
+        "next_action": "Promote dependent packets",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "implementation_agent": "OPENCODE-DS41F",
+      "reviews": [
+        {
+          "reviewer": "REVIEWER-13",
+          "decision": "reject",
+          "reviewed_at": "2026-10-31T01:53:57Z",
+          "evidence": "evidence/W10-B-review1.md",
+          "evidence_sha256": "e7c4dd4517452931e7f636eb16f77eece7d929ed246104938bf283b2e4e60956",
+          "severity": "medium",
+          "finding": "409 not pinned to profile_required"
+        },
+        {
+          "reviewer": "REVIEWER-13",
+          "decision": "approve",
+          "reviewed_at": "2026-10-31T01:54:08Z",
+          "evidence": "evidence/W10-B-review2.md",
+          "evidence_sha256": "9c71e4d854e25703444296ebbb5983755b2cf0ab72aff6b21d75a0bc2f7c11eb"
+        }
+      ],
+      "central": {
+        "task": "dutch-ref/W10-B",
+        "revision": 0,
+        "status": "reviewed",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W10-C",
+      "title": "Fixtures, harness and bundle pin",
+      "kind": "implementation",
+      "status": "green",
+      "packet": "packets/W10-C.md",
+      "evidence": "evidence/W10-C.md",
+      "depends_on": [
+        "W10-A",
+        "W10-B"
+      ],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "contracts/http/fixtures/error/profile-required.json",
+        "contracts/http/fixtures/success/profile-state-required.json",
+        "contracts/http/fixtures/success/profile-state-ready.json",
+        "contracts/http/fixtures/success/profile-ready.json",
+        "contracts/events/fixtures/dutch/member-profile-mapping-changed.json",
+        "contracts/events/fixtures/dutch/forbidden-identity.json",
+        "contracts/validate-contracts.mjs",
+        "contracts/test/validate-contracts.test.mjs",
+        "contracts/imported/iam/PINNED.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T01:54:19Z",
+        "summary": "Fixtures and harness updated; 10/10 tests and clean validation; IAM bundle pinned",
+        "next_action": "Await independent review",
+        "last_verified_command": "npm test 10/10; node validate-contracts.mjs exit 0",
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [
+          "UMS code sweep is W-11/W-12"
+        ],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "unblock_history": [
+        {
+          "actor": "OPENCODE-DS41F",
+          "evidence": "evidence/W10-A-review.md"
+        }
+      ],
+      "implementation_agent": "OPENCODE-DS41F",
+      "central": {
+        "task": "dutch-ref/W10-C",
+        "revision": 0,
+        "status": "green",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W10-R",
+      "title": "Contract and privacy review",
+      "kind": "review",
+      "status": "accepted",
+      "packet": "packets/W10-R.md",
+      "evidence": "evidence/W10-R.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "docs/wayfinder/w10/evidence/W10-R.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T01:59:30Z",
+        "summary": "Independent review accepted",
+        "next_action": "Await other reviews or accept parent",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "unblock_history": [
+        {
+          "actor": "REVIEWER-14",
+          "evidence": "evidence/W10-C.md"
+        }
+      ],
+      "implementation_agent": "REVIEWER-14",
+      "reviews": [
+        {
+          "reviewer": "REVIEWER-14",
+          "decision": "approve",
+          "reviewed_at": "2026-10-31T01:59:30Z",
+          "evidence": "evidence/W10-R.md",
+          "evidence_sha256": "1aa67639a21ab541929b7be3ef3c5a11f12ebcdcc4493c94df54a121fde41c3d"
+        }
+      ],
+      "accepted_bindings": [],
+      "central": {
+        "task": "dutch-ref/W10-R",
+        "revision": 0,
+        "status": "accepted",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W10-F",
+      "title": "Finalize accepted W-10 status",
+      "kind": "integration",
+      "status": "integrated",
+      "packet": "packets/W10-F.md",
+      "evidence": "evidence/W10-F.md",
+      "depends_on": [
+        "W10-R"
+      ],
+      "dependency_gate": "accepted",
+      "write_paths": [
+        "docs/wayfinder/w10/README.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T01:59:43Z",
+        "summary": "Integration gates passed",
+        "next_action": "Promote independent review packets",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "unblock_history": [
+        {
+          "actor": "OPENCODE-DS41F",
+          "evidence": "evidence/W10-R.md"
+        }
+      ],
+      "implementation_agent": "OPENCODE-DS41F",
+      "integration_revision": 24,
+      "evidence_sha256": "19762b1abf12af7ab3e0463e94e34437271ee6d501ff3963f95ca546fc48cfb7",
+      "central": {
+        "task": "dutch-ref/W10-F",
+        "revision": 0,
+        "status": "integrated",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    }
+  ],
+  "accepted_by": "OPENCODE-DS41F",
+  "central_registry": {
+    "home": "capabilities/work",
+    "board": "dutch.ref.w10",
+    "synced_at": "2026-11-01T00:00:00Z"
+  }
+}

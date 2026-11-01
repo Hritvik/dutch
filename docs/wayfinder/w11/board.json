@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "revision": 29,
+  "project": "Dutch W-11 UMS onboarding consumer",
+  "source_plan": "../../../docs/identity-platform/wayfinder/work-items.md#W-11",
+  "review_threshold": "medium",
+  "parent_status": "accepted",
+  "parent_acceptance_packet": "W11-F",
+  "repository_root_up": 3,
+  "lock_stale_after_seconds": 1800,
+  "claim_stale_after_seconds": 1800,
+  "execution_leases": {},
+  "packets": [
+    {
+      "id": "W11-A",
+      "title": "Reshape the UMS schema for app-scoped onboarding",
+      "kind": "implementation",
+      "status": "reviewed",
+      "packet": "packets/W11-A.md",
+      "evidence": "evidence/W11-A.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "services/ums/src/main/resources/db/migration/V3__app_scoped_member_profile.sql",
+        "services/ums/src/main/java/com/dutch/ums/profile/MemberProfile.java",
+        "services/ums/src/main/java/com/dutch/ums/profile/MemberProfileRepository.java",
+        "services/ums/src/main/java/com/dutch/ums/profile/JdbcMemberProfileRepository.java",
+        "services/ums/src/test/java/com/dutch/ums/MigrationIntegrationTest.java"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T02:22:42Z",
+        "summary": "Independent review accepted",
+        "next_action": "Promote dependent packets",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "implementation_agent": "OPENCODE-DS41F",
+      "reviews": [
+        {
+          "reviewer": "REVIEWER-15",
+          "decision": "reject",
+          "reviewed_at": "2026-10-31T02:17:05Z",
+          "evidence": "evidence/W11-A-review1.md",
+          "evidence_sha256": "53a9c3e5c28f1ed93efbf3859c822044b8b112d49565acf00de97bfa0e68465a",
+          "severity": "medium",
+          "finding": "destructive V3 without upgrade proof"
+        },
+        {
+          "reviewer": "REVIEWER-15",
+          "decision": "approve",
+          "reviewed_at": "2026-10-31T02:22:42Z",
+          "evidence": "evidence/W11-A-review2.md",
+          "evidence_sha256": "c2da12bceac1a5f91b5c61693cf827ad1367c6b463990f76abacc05726170a74"
+        }
+      ],
+      "central": {
+        "task": "dutch-ref/W11-A",
+        "revision": 0,
+        "status": "reviewed",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W11-B",
+      "title": "Consume onboarding idempotently",
+      "kind": "implementation",
+      "status": "reviewed",
+      "packet": "packets/W11-B.md",
+      "evidence": "evidence/W11-B.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "services/ums/src/main/java/com/dutch/ums/profile/OnboardingReadyEvent.java",
+        "services/ums/src/main/java/com/dutch/ums/profile/MemberMappingChanged.java",
+        "services/ums/src/main/java/com/dutch/ums/profile/JdbcMemberProfileConsumer.java",
+        "services/ums/src/test/java/com/dutch/ums/profile/JdbcMemberProfileConsumerIntegrationTest.java"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T02:22:43Z",
+        "summary": "Independent review accepted",
+        "next_action": "Promote dependent packets",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "implementation_agent": "OPENCODE-DS41F",
+      "reviews": [
+        {
+          "reviewer": "REVIEWER-15",
+          "decision": "reject",
+          "reviewed_at": "2026-10-31T02:17:05Z",
+          "evidence": "evidence/W11-B-review1.md",
+          "evidence_sha256": "80a9beacc34ad6247a5ead01aab0342de147de550ffdc2a7c62021888eca2dfa",
+          "severity": "high",
+          "finding": "null causationId rejected"
+        },
+        {
+          "reviewer": "REVIEWER-15",
+          "decision": "approve",
+          "reviewed_at": "2026-10-31T02:22:43Z",
+          "evidence": "evidence/W11-B-review2.md",
+          "evidence_sha256": "e36b35ab821c3a006fbae7035452e042d5e0d810eec9ea47da092d2118f699f0"
+        }
+      ],
+      "central": {
+        "task": "dutch-ref/W11-B",
+        "revision": 0,
+        "status": "reviewed",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W11-C",
+      "title": "Prove idempotency and fault handling",
+      "kind": "integration",
+      "status": "green",
+      "packet": "packets/W11-C.md",
+      "evidence": "evidence/W11-C.md",
+      "depends_on": [
+        "W11-A",
+        "W11-B"
+      ],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "services/ums/src/test/java/com/dutch/ums/profile/OnboardingFaultIntegrationTest.java",
+        "docs/wayfinder/w11/evidence/W11-C.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T02:22:54Z",
+        "summary": "Concurrency, restart, conflict and transactional rollback proven; 16/16",
+        "next_action": "Await independent review",
+        "last_verified_command": ":services:ums:test BUILD SUCCESSFUL",
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [
+          "Environment default and assertion rigor are low follow-ups"
+        ],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "unblock_history": [
+        {
+          "actor": "OPENCODE-DS41F",
+          "evidence": "evidence/W11-A-review2.md"
+        }
+      ],
+      "implementation_agent": "OPENCODE-DS41F",
+      "central": {
+        "task": "dutch-ref/W11-C",
+        "revision": 0,
+        "status": "green",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W11-R",
+      "title": "Independent correctness and privacy review",
+      "kind": "review",
+      "status": "accepted",
+      "packet": "packets/W11-R.md",
+      "evidence": "evidence/W11-R.md",
+      "depends_on": [],
+      "dependency_gate": "reviewed",
+      "write_paths": [
+        "docs/wayfinder/w11/evidence/W11-R.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T02:35:47Z",
+        "summary": "Independent review accepted",
+        "next_action": "Await other reviews or accept parent",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "unblock_history": [
+        {
+          "actor": "REVIEWER-16",
+          "evidence": "evidence/W11-C.md"
+        }
+      ],
+      "implementation_agent": "REVIEWER-16",
+      "reviews": [
+        {
+          "reviewer": "REVIEWER-16",
+          "decision": "approve",
+          "reviewed_at": "2026-10-31T02:35:47Z",
+          "evidence": "evidence/W11-R.md",
+          "evidence_sha256": "39a63ad4456a7b84c1d0b6d8794eb7795872f4f564ceaeadc53fe5ee0507d010"
+        }
+      ],
+      "accepted_bindings": [],
+      "central": {
+        "task": "dutch-ref/W11-R",
+        "revision": 0,
+        "status": "accepted",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    },
+    {
+      "id": "W11-F",
+      "title": "Finalize accepted W-11 status",
+      "kind": "integration",
+      "status": "integrated",
+      "packet": "packets/W11-F.md",
+      "evidence": "evidence/W11-F.md",
+      "depends_on": [
+        "W11-R"
+      ],
+      "dependency_gate": "accepted",
+      "write_paths": [
+        "docs/wayfinder/w11/README.md"
+      ],
+      "shared_paths": [],
+      "lock_groups": [],
+      "execution_lock_groups": [],
+      "claim": null,
+      "checkpoint": {
+        "updated_at": "2026-10-31T02:35:48Z",
+        "summary": "Integration gates passed",
+        "next_action": "Promote independent review packets",
+        "last_verified_command": null,
+        "current_failure": null,
+        "changed_files": [],
+        "decisions": [],
+        "risks": [],
+        "blockers": [],
+        "unblock_condition": null
+      },
+      "unblock_history": [
+        {
+          "actor": "OPENCODE-DS41F",
+          "evidence": "evidence/W11-R.md"
+        }
+      ],
+      "implementation_agent": "OPENCODE-DS41F",
+      "integration_revision": 28,
+      "evidence_sha256": "8366b6a5a73cdf1bcdcd28f74662b84eb03ccd34f602cd2571e9e0a728d42d3f",
+      "central": {
+        "task": "dutch-ref/W11-F",
+        "revision": 0,
+        "status": "integrated",
+        "claim": null,
+        "synced_at": "2026-11-01T00:00:00Z"
+      }
+    }
+  ],
+  "accepted_by": "OPENCODE-DS41F",
+  "central_registry": {
+    "home": "capabilities/work",
+    "board": "dutch.ref.w11",
+    "synced_at": "2026-11-01T00:00:00Z"
+  }
+}

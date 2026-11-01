@@ -87,63 +87,12 @@ public final class Expense {
     }
 
     public List<ObligationEntry> obligationEntries() {
-        SortedMap<MemberId, Long> positions = new TreeMap<>(netPositions());
-        List<Position> debtors = new ArrayList<>();
-        List<Position> creditors = new ArrayList<>();
-        for (Map.Entry<MemberId, Long> entry : positions.entrySet()) {
-            long amount = entry.getValue();
-            if (amount < 0) {
-                debtors.add(new Position(entry.getKey(), -amount));
-            } else if (amount > 0) {
-                creditors.add(new Position(entry.getKey(), amount));
-            }
-        }
-        debtors.sort(Comparator.comparingLong(Position::amount).reversed()
-                .thenComparing(Position::memberId));
-        creditors.sort(Comparator.comparingLong(Position::amount).reversed()
-                .thenComparing(Position::memberId));
-
-        List<ObligationEntry> entries = new ArrayList<>();
-        int debtorIndex = 0;
-        int creditorIndex = 0;
-        while (debtorIndex < debtors.size() && creditorIndex < creditors.size()) {
-            Position debtor = debtors.get(debtorIndex);
-            Position creditor = creditors.get(creditorIndex);
-            long amount = Math.min(debtor.remaining(), creditor.remaining());
-            if (amount > 0) {
-                entries.add(new ObligationEntry(id, revision, debtor.memberId(), creditor.memberId(),
-                        amount, currency, algorithmVersion));
-            }
-            debtor.consume(amount);
-            creditor.consume(amount);
-            if (debtor.remaining() == 0) {
-                debtorIndex++;
-            }
-            if (creditor.remaining() == 0) {
-                creditorIndex++;
-            }
-        }
-        return List.copyOf(entries);
+        return ObligationMatcher.entries(id, revision, currency, payers, shares, algorithmVersion);
     }
 
     /** Positive means the member is owed; negative means the member owes. */
     public SortedMap<MemberId, Long> netPositions() {
-        SortedMap<MemberId, Long> positions = new TreeMap<>();
-        for (PayerContribution payer : payers) {
-            positions.merge(payer.memberId(), payer.minorUnits(), Math::addExact);
-        }
-        for (ParticipantShare share : shares) {
-            positions.merge(share.memberId(), -share.minorUnits(), Math::addExact);
-        }
-        long sum = 0;
-        for (long value : positions.values()) {
-            sum = Math.addExact(sum, value);
-        }
-        if (sum != 0) {
-            throw new IllegalStateException("expense positions must net to zero");
-        }
-        positions.entrySet().removeIf(entry -> entry.getValue() == 0);
-        return positions;
+        return ObligationMatcher.netPositions(payers, shares);
     }
 
     public ExpenseId id() {

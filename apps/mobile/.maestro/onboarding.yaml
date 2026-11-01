@@ -3,13 +3,16 @@ appId: com.dutch.mobile
 - launchApp:
     clearState: true
 - assertVisible: "Share costs without losing the plot."
+- takeScreenshot: android-signed-out
 - tapOn: "Use test identity"
 - assertVisible: "Setting up your profile."
 - assertVisible: "Check again"
+- takeScreenshot: android-profile-required
 - extendedWaitUntil:
     visible: "You are signed in."
     timeout: 20000
 - assertVisible: "mem_dev_012345678901234567"
 - assertVisible: "Ledger access active"
+- takeScreenshot: android-home
 - tapOn: "Sign out"
 - assertVisible: "Share costs without losing the plot."

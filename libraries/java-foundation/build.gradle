@@ -1,0 +1,5 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Technical-only primitives shared across Dutch services. Domain models are forbidden here.'

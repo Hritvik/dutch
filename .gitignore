@@ -1,6 +1,14 @@
 HELP.md
 .gradle
+.gradle-user-home/
 build/
+**/node_modules/
+**/.expo/
+infrastructure/local/.env
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.DS_Store
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
@@ -16,6 +24,7 @@ build/
 bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
+!infrastructure/local/bin/
 
 ### IntelliJ IDEA ###
 .idea

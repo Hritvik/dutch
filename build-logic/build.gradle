@@ -1,0 +1,26 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.dutch.buildlogic'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testImplementation gradleTestKit()
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'dutch.root.dir', rootProject.projectDir.absolutePath
+}

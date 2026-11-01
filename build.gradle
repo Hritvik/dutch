@@ -1,36 +1,97 @@
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '3.4.5'
-	id 'io.spring.dependency-management' version '1.1.7'
+	alias(libs.plugins.spring.boot) apply false
+	alias(libs.plugins.spring.dependency.management) apply false
+	id 'base'
 }
 
-group = 'com.vik.dutch'
+group = 'com.dutch'
 version = '0.0.1-SNAPSHOT'
 
-java {
-	sourceCompatibility = '21'
-}
+allprojects {
+	group = rootProject.group
+	version = rootProject.version
 
-configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
+	repositories {
+		mavenCentral()
 	}
 }
 
-repositories {
-	mavenCentral()
+subprojects {
+	apply plugin: 'jacoco'
+
+	plugins.withId('java') {
+		java {
+			toolchain {
+				languageVersion = JavaLanguageVersion.of(21)
+			}
+		}
+
+		tasks.withType(Test).configureEach {
+			useJUnitPlatform()
+		}
+
+		tasks.named('jacocoTestReport') {
+			dependsOn tasks.named('test')
+			reports {
+				xml.required = true
+				html.required = true
+			}
+		}
+	}
 }
 
-dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
-	compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	annotationProcessor 'org.projectlombok:lombok'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+def serviceProjectPaths = [
+	':services:gateway',
+	':services:iam',
+	':services:ums',
+	':services:ledger',
+	':services:notification'
+] as Set
+
+gradle.projectsEvaluated {
+	if (providers.gradleProperty('verifyForbiddenServiceDependency').isPresent()) {
+		project(':services:gateway').dependencies.add(
+				'implementation', project(':services:ledger'))
+	}
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+tasks.register('verifyServiceBoundaries') {
+	group = 'verification'
+	description = 'Rejects direct implementation dependencies between independently deployed services.'
+
+	doLast {
+		serviceProjectPaths.collect { project(it) }.each { serviceProject ->
+			serviceProject.configurations.each { configuration ->
+				configuration.dependencies.withType(ProjectDependency).each { dependency ->
+					if (dependency.dependencyProject.path in serviceProjectPaths) {
+						throw new GradleException(
+								"${serviceProject.path} must not depend on independently deployed service ${dependency.dependencyProject.path}. " +
+								"Use versioned HTTP or event contracts instead.")
+					}
+				}
+			}
+		}
+	}
+}
+
+tasks.register('verifyContracts', Exec) {
+	group = 'verification'
+	description = 'Validates versioned OpenAPI, JSON Schema, and producer/consumer contract fixtures.'
+	workingDir layout.projectDirectory.dir('contracts')
+	commandLine 'npm', 'run', 'validate'
+	inputs.dir layout.projectDirectory.dir('contracts/http')
+	inputs.dir layout.projectDirectory.dir('contracts/events')
+	inputs.file layout.projectDirectory.file('contracts/validate-contracts.mjs')
+	outputs.upToDateWhen { false }
+}
+
+tasks.register('jacocoTestReport') {
+	group = 'verification'
+	description = 'Generates XML and HTML coverage reports for every Java subproject.'
+}
+
+gradle.projectsEvaluated {
+	tasks.named('jacocoTestReport') {
+		dependsOn subprojects.collect { subproject -> subproject.tasks.findByName('jacocoTestReport') }.findAll { it != null }
+	}
 }

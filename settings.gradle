@@ -1,1 +1,16 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'dutch'
+
+include ':build-logic'
+include ':libraries:java-foundation'
+include ':services:gateway'
+include ':services:iam'
+include ':services:ums'
+include ':services:ledger'
+include ':services:notification'

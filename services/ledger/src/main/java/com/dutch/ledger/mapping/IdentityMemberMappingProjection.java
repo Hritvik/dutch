@@ -7,6 +7,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * @deprecated legacy UUID-keyed projection; new code uses the app-subject mapping
+ * table and {@link MemberMappingEvent}.
+ */
+@Deprecated(forRemoval = true)
 /** Ledger-owned, fail-closed authorization projection fed from UMS events. */
 public final class IdentityMemberMappingProjection {
 

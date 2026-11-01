@@ -76,9 +76,21 @@ class GroupControllerTest {
     }
 
     @Test
+    void a_non_member_activation_is_not_enumerable() throws Exception {
+        String groupId = createGroup();
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + MEMBER.value() + "/activate")
+                        .with(as(OUTSIDER_SUBJECT))
+                        .header("If-Match", "\"0\""))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("not_found"));
+    }
+
+    @Test
     void an_invited_member_activates_and_then_reads_but_cannot_invite() throws Exception {
         String groupId = createGroup();
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":\"" + MEMBER.value() + "\",\"role\":\"MEMBER\"}"))
                 .andExpect(status().isOk());
@@ -87,7 +99,8 @@ class GroupControllerTest {
                 .andExpect(status().isNotFound());
 
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + MEMBER.value() + "/activate")
-                        .with(as(MEMBER_SUBJECT)))
+                        .with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"1\""))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/groups/" + groupId).with(as(MEMBER_SUBJECT)))
@@ -95,10 +108,40 @@ class GroupControllerTest {
                 .andExpect(jsonPath("$.data.id").value(groupId));
 
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"2\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":\"mem_312345678901234567\",\"role\":\"MEMBER\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("forbidden"));
+    }
+
+    @Test
+    void a_removed_member_must_be_reinvited_before_reactivating() throws Exception {
+        String groupId = createGroup();
+        activateMember(groupId);
+        mockMvc.perform(delete("/api/v1/groups/" + groupId + "/members/" + MEMBER.value())
+                        .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"2\""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + MEMBER.value() + "/activate")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"3\""))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("conflict"));
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"3\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + MEMBER.value() + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberships[1].state").value("INVITED"));
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + MEMBER.value() + "/activate")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"4\""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberships[1].state").value("ACTIVE"));
     }
 
     @Test
@@ -107,10 +150,11 @@ class GroupControllerTest {
 
         mockMvc.perform(patch("/api/v1/groups/" + groupId + "/members/" + ADMIN.value())
                         .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"role\":\"MEMBER\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("conflict"));
+                .andExpect(jsonPath("$.error.code").value("last_admin"));
     }
 
     @Test
@@ -118,7 +162,8 @@ class GroupControllerTest {
         String groupId = createGroup();
         activateMember(groupId);
 
-        mockMvc.perform(post("/api/v1/groups/" + groupId + "/archive").with(as(ADMIN_SUBJECT)))
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/archive").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"2\""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.state").value("ARCHIVED"));
 
@@ -126,6 +171,7 @@ class GroupControllerTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"3\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":\"mem_312345678901234567\",\"role\":\"MEMBER\"}"))
                 .andExpect(status().isConflict());
@@ -137,7 +183,8 @@ class GroupControllerTest {
         activateMember(groupId);
 
         mockMvc.perform(delete("/api/v1/groups/" + groupId + "/members/" + MEMBER.value())
-                        .with(as(ADMIN_SUBJECT)))
+                        .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"2\""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.memberships[1].state").value("INACTIVE"));
 
@@ -145,6 +192,7 @@ class GroupControllerTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"3\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":\"mem_312345678901234567\",\"role\":\"MEMBER\"}"))
                 .andExpect(status().isForbidden());
@@ -167,7 +215,7 @@ class GroupControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":\"" + second + "\",\"role\":\"MEMBER\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("conflict"));
+                .andExpect(jsonPath("$.error.code").value("stale_version"));
 
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
                         .header("If-Match", "\"1\"")
@@ -208,11 +256,13 @@ class GroupControllerTest {
 
     private void activateMember(String groupId) throws Exception {
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"memberId\":\"" + MEMBER.value() + "\",\"role\":\"MEMBER\"}"))
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + MEMBER.value() + "/activate")
-                        .with(as(MEMBER_SUBJECT)))
+                        .with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"1\""))
                 .andExpect(status().isOk());
     }
 

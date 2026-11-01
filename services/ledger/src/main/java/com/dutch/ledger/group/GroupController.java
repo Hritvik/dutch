@@ -45,7 +45,7 @@ public class GroupController {
 
     @PostMapping("/{groupId}/members")
     ResponseEntity<Map<String, Object>> addMember(@AuthenticationPrincipal Jwt jwt, @PathVariable String groupId,
-                                                  @RequestHeader(value = "If-Match", required = false) String ifMatch,
+                                                  @RequestHeader(value = "If-Match", required = true) String ifMatch,
                                                   @RequestBody MembershipRequest request) {
         Long expected = expectedVersion(ifMatch);
         GroupView view = request.placeholder()
@@ -57,7 +57,7 @@ public class GroupController {
     @PostMapping("/{groupId}/members/{memberId}/activate")
     ResponseEntity<Map<String, Object>> activate(@AuthenticationPrincipal Jwt jwt, @PathVariable String groupId,
                                                  @PathVariable String memberId,
-                                                 @RequestHeader(value = "If-Match", required = false) String ifMatch) {
+                                                 @RequestHeader(value = "If-Match", required = true) String ifMatch) {
         return ResponseEntity.ok(Map.of("data",
                 groups.activate(jwt.getSubject(), groupId, memberId, expectedVersion(ifMatch))));
     }
@@ -65,7 +65,7 @@ public class GroupController {
     @DeleteMapping("/{groupId}/members/{memberId}")
     ResponseEntity<Map<String, Object>> deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable String groupId,
                                                    @PathVariable String memberId,
-                                                   @RequestHeader(value = "If-Match", required = false) String ifMatch) {
+                                                   @RequestHeader(value = "If-Match", required = true) String ifMatch) {
         return ResponseEntity.ok(Map.of("data",
                 groups.deactivate(jwt.getSubject(), groupId, memberId, expectedVersion(ifMatch))));
     }
@@ -73,7 +73,7 @@ public class GroupController {
     @PatchMapping("/{groupId}/members/{memberId}")
     ResponseEntity<Map<String, Object>> changeRole(@AuthenticationPrincipal Jwt jwt, @PathVariable String groupId,
                                                    @PathVariable String memberId,
-                                                   @RequestHeader(value = "If-Match", required = false) String ifMatch,
+                                                   @RequestHeader(value = "If-Match", required = true) String ifMatch,
                                                    @RequestBody RoleRequest request) {
         return ResponseEntity.ok(Map.of("data",
                 groups.changeRole(jwt.getSubject(), groupId, memberId, request.role(),
@@ -82,14 +82,14 @@ public class GroupController {
 
     @PostMapping("/{groupId}/archive")
     ResponseEntity<Map<String, Object>> archive(@AuthenticationPrincipal Jwt jwt, @PathVariable String groupId,
-                                                @RequestHeader(value = "If-Match", required = false) String ifMatch) {
+                                                @RequestHeader(value = "If-Match", required = true) String ifMatch) {
         return ResponseEntity.ok(Map.of("data",
                 groups.archive(jwt.getSubject(), groupId, expectedVersion(ifMatch))));
     }
 
     @PostMapping("/{groupId}/reopen")
     ResponseEntity<Map<String, Object>> reopen(@AuthenticationPrincipal Jwt jwt, @PathVariable String groupId,
-                                               @RequestHeader(value = "If-Match", required = false) String ifMatch) {
+                                               @RequestHeader(value = "If-Match", required = true) String ifMatch) {
         return ResponseEntity.ok(Map.of("data",
                 groups.reopen(jwt.getSubject(), groupId, expectedVersion(ifMatch))));
     }

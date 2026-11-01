@@ -242,7 +242,7 @@ components:
     IfMatch:
       name: If-Match
       in: header
-      required: false
+      required: true
       description: Expected aggregate version; a mismatch returns 409 conflict.
       schema:
         type: string

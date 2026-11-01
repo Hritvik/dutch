@@ -69,10 +69,16 @@ public final class Group {
         requireManager(actor);
         Objects.requireNonNull(invitee, "invitee");
         Objects.requireNonNull(role, "role");
-        if (memberships.containsKey(invitee)) {
-            throw new GroupRuleException("The member already belongs to this group.");
-        }
+        Membership existing = memberships.get(invitee);
         Map<MemberId, Membership> next = new LinkedHashMap<>(memberships);
+        if (existing != null) {
+            if (existing.state() != MembershipState.INACTIVE) {
+                throw new GroupRuleException("The member already belongs to this group.");
+            }
+            next.put(invitee, new Membership(invitee, MembershipState.INVITED, role, existing.joinedAt(), now));
+            commit(next);
+            return;
+        }
         next.put(invitee, new Membership(invitee, MembershipState.INVITED, role, now, now));
         commit(next);
     }
@@ -99,6 +105,9 @@ public final class Group {
         Membership current = requireMembership(target);
         if (current.state() == MembershipState.ACTIVE) {
             throw new GroupRuleException("The membership is already active.");
+        }
+        if (current.state() == MembershipState.INACTIVE) {
+            throw new GroupRuleException("Reactivation requires a new invitation and acceptance.");
         }
         Map<MemberId, Membership> next = new LinkedHashMap<>(memberships);
         next.put(target, current.withState(MembershipState.ACTIVE, now));

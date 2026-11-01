@@ -76,6 +76,27 @@ class GroupTest {
     }
 
     @Test
+    void a_removed_member_must_be_reinvited_before_reactivating() {
+        Group group = group();
+        group.invite(ADMIN, MEMBER, GroupRole.MEMBER, NOW);
+        group.activate(MEMBER, MEMBER, NOW);
+        group.remove(ADMIN, MEMBER, NOW);
+
+        assertThatThrownBy(() -> group.activate(MEMBER, MEMBER, NOW))
+                .isInstanceOf(GroupRuleException.class)
+                .hasMessageContaining("new invitation");
+        assertThat(group.membership(MEMBER)).get()
+                .extracting(Membership::state).isEqualTo(MembershipState.INACTIVE);
+
+        group.invite(ADMIN, MEMBER, GroupRole.MEMBER, NOW);
+        assertThat(group.membership(MEMBER)).get()
+                .extracting(Membership::state).isEqualTo(MembershipState.INVITED);
+
+        group.activate(MEMBER, MEMBER, NOW);
+        assertThat(group.canCollaborate(MEMBER)).isTrue();
+    }
+
+    @Test
     void the_last_active_admin_cannot_be_demoted() {
         Group group = group();
 

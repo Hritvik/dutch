@@ -23,6 +23,18 @@ final class GroupErrorHandler {
         return error(request, HttpStatus.FORBIDDEN, "forbidden", "Access is denied");
     }
 
+    @ExceptionHandler(ConcurrentGroupUpdateException.class)
+    ResponseEntity<Map<String, Object>> stale(HttpServletRequest request) {
+        return error(request, HttpStatus.CONFLICT, "stale_version",
+                "The group changed. Refresh and retry.");
+    }
+
+    @ExceptionHandler(LastAdminException.class)
+    ResponseEntity<Map<String, Object>> lastAdmin(HttpServletRequest request) {
+        return error(request, HttpStatus.CONFLICT, "last_admin",
+                "A group must retain at least one active Admin.");
+    }
+
     @ExceptionHandler(GroupRuleException.class)
     ResponseEntity<Map<String, Object>> conflict(HttpServletRequest request) {
         return error(request, HttpStatus.CONFLICT, "conflict",

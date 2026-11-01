@@ -1,5 +1,6 @@
 package com.dutch.iam.identity;
 
+import java.sql.Timestamp;
 import java.util.UUID;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,10 +15,10 @@ public final class JdbcIdentityLifecycleRepository implements IdentityStore, Ide
     @Override
     public void save(Identity identity, ProtectedVerifiedIdentifier identifier) {
         jdbc.update("INSERT INTO identity(identity_id, security_state, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                identity.identityId(), identity.securityState(), identity.createdAt(), identity.updatedAt());
+                identity.identityId(), identity.securityState(), Timestamp.from(identity.createdAt()), Timestamp.from(identity.updatedAt()));
         jdbc.update("INSERT INTO verified_identifier(identifier_id, identity_id, identifier_type, lookup_digest, ciphertext, key_version, identifier_version, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'VERIFIED', ?)",
                 identifier.identifierId(), identifier.identityId(), identifier.type().name(), identifier.lookupDigest(),
-                identifier.ciphertext(), identifier.keyVersion(), identifier.identifierVersion(), identifier.createdAt());
+                identifier.ciphertext(), identifier.keyVersion(), identifier.identifierVersion(), Timestamp.from(identifier.createdAt()));
     }
 
     @Override
@@ -25,7 +26,7 @@ public final class JdbcIdentityLifecycleRepository implements IdentityStore, Ide
         String payload = serialize(event);
         jdbc.update("INSERT INTO outbox_event(event_id, event_type, aggregate_type, aggregate_id, aggregate_version, payload, occurred_at) VALUES (?, ?, ?, ?, ?, CAST(? AS JSONB), ?)",
                 event.eventId(), "iam.identity.verified.v1", "Identity", event.identityId(),
-                event.identityVersion(), payload, event.occurredAt());
+                event.identityVersion(), payload, Timestamp.from(event.occurredAt()));
     }
 
     private String serialize(IdentityVerifiedEvent event) {

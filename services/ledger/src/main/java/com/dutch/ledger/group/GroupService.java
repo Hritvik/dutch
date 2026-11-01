@@ -56,7 +56,7 @@ public class GroupService {
     public GroupView activate(String appSubject, String groupId, String memberId, Long expectedVersion) {
         MemberId actor = requireMember(appSubject);
         MemberId target = new MemberId(memberId);
-        Group group = requireGroup(groupId);
+        Group group = actor.equals(target) ? requireGroup(groupId) : requireReadable(actor, groupId);
         if (!actor.equals(target)) {
             requireAdmin(actor, group);
         }

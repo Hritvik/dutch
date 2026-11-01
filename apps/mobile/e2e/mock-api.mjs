@@ -3,7 +3,10 @@ import { createServer } from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 4010);
 const REQUIRED_READS = 2;
-const DEV_MEMBER = 'mem_dev_012345678901234567';
+const ADMIN_SUBJECT = 'aps_dev_0123456789012345678901';
+const MEMBER_SUBJECT = 'aps_member_012345678901234567890';
+const ADMIN_MEMBER = 'mem_dev_012345678901234567';
+const MEMBER_MEMBER = 'mem_member_012345678901234567';
 let profileStateReads = 0;
 
 function seedGroups() {
@@ -15,7 +18,8 @@ function seedGroups() {
       state: 'ACTIVE',
       version: 1,
       memberships: [
-        { memberId: DEV_MEMBER, role: 'ADMIN', state: 'ACTIVE' },
+        { memberId: ADMIN_MEMBER, role: 'ADMIN', state: 'ACTIVE' },
+        { memberId: MEMBER_MEMBER, role: 'MEMBER', state: 'ACTIVE' },
         { memberId: 'mem_112345678901234567', role: 'MEMBER', state: 'INACTIVE' }
       ]
     }
@@ -28,6 +32,21 @@ function json(response, status, body) {
   const payload = JSON.stringify(body);
   response.writeHead(status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) });
   response.end(payload);
+}
+
+function subjectFrom(request) {
+  const token = String(request.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  try {
+    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')).sub ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function memberFor(subject) {
+  return subject === MEMBER_SUBJECT ? MEMBER_MEMBER : ADMIN_MEMBER;
 }
 
 function readBody(request) {
@@ -67,7 +86,7 @@ const server = createServer(async (request, response) => {
       currency: String(payload.currency ?? 'INR'),
       state: 'ACTIVE',
       version: 0,
-      memberships: [{ memberId: DEV_MEMBER, role: 'ADMIN', state: 'ACTIVE' }]
+      memberships: [{ memberId: memberFor(subjectFrom(request)), role: 'ADMIN', state: 'ACTIVE' }]
     };
     groups = [group, ...groups];
     json(response, 200, { data: group });
@@ -136,8 +155,8 @@ const server = createServer(async (request, response) => {
     if (profileStateReads > REQUIRED_READS) {
       json(response, 200, {
         data: {
-          memberId: DEV_MEMBER,
-          displayName: 'Ada',
+          memberId: memberFor(subjectFrom(request)),
+          displayName: subjectFrom(request) === MEMBER_SUBJECT ? 'Bela' : 'Ada',
           profileState: 'PROFILE_READY',
           lifecycleState: 'ACTIVE'
         }

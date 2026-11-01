@@ -120,10 +120,23 @@ export async function createGroup(
 }
 
 export class GroupHttpError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(readonly status: number, message: string, readonly code: string = 'error') {
     super(message);
     this.name = 'GroupHttpError';
   }
+}
+
+async function toError(response: Response): Promise<GroupHttpError> {
+  let code = 'error';
+  try {
+    const payload = await response.json();
+    if (isRecord(payload) && isRecord(payload.error) && typeof payload.error.code === 'string') {
+      code = payload.error.code;
+    }
+  } catch {
+    // Keep the generic code when the error body is not JSON.
+  }
+  return new GroupHttpError(response.status, `Group request failed with ${response.status}.`, code);
 }
 
 async function send(
@@ -151,7 +164,7 @@ async function send(
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   if (!response.ok) {
-    throw new GroupHttpError(response.status, `Group request failed with ${response.status}.`);
+    throw await toError(response);
   }
   const payload = await response.json();
   if (!isRecord(payload)) {
@@ -171,7 +184,7 @@ export async function fetchGroup(
     headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` }
   });
   if (!response.ok) {
-    throw new GroupHttpError(response.status, `Group request failed with ${response.status}.`);
+    throw await toError(response);
   }
   const payload = await response.json();
   if (!isRecord(payload)) {

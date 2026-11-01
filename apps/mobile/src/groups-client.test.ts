@@ -95,10 +95,14 @@ test('fetches one group and sends the version precondition on mutation', async (
   assert.equal(new Headers(calls[2]?.init?.headers).get('if-match'), '"2"');
 });
 
-test('surfaces a stale-version conflict as an HTTP error', async () => {
+test('surfaces a stale-version conflict with its published code', async () => {
   await assert.rejects(
     archiveGroup('https://api.example.test', 'token', group.id, 9,
-      async () => new Response('', { status: 409 })),
-    (error: unknown) => error instanceof GroupHttpError && error.status === 409
+      async () => new Response(JSON.stringify({
+        error: { code: 'stale_version', message: 'The group changed. Refresh and retry.' }
+      }), { status: 409 })),
+    (error: unknown) => error instanceof GroupHttpError
+      && error.status === 409
+      && error.code === 'stale_version'
   );
 });

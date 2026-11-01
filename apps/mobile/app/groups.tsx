@@ -75,7 +75,7 @@ export default function GroupsScreen() {
 
       {groups !== null && !error && groups.length === 0 ? (
         <View style={styles.error}>
-          <Text style={styles.muted}>No groups yet. Create one from Home when the composer lands.</Text>
+          <Text style={styles.muted}>No groups yet. Create one with the New group button.</Text>
         </View>
       ) : null}
 

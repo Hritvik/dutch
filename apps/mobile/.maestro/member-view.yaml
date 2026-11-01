@@ -1,0 +1,16 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- tapOn: "Use member identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- assertVisible: "Your groups."
+- tapOn: "Flat 12"
+- assertVisible: "Members"
+- assertVisible: "mem_member_012345678901234567.*"
+- assertNotVisible: "Invite a member"
+- assertNotVisible: "Archive group"
+- takeScreenshot: android-member-view

@@ -46,13 +46,15 @@ export default function GroupDetailScreen() {
         setError('Sign in again to open this group.');
         return;
       }
-      const [loaded, profile] = await Promise.all([
-        fetchGroup(config.apiBaseUrl, material.accessToken, id),
-        fetchMemberProfile(config.apiBaseUrl, material.accessToken)
-      ]);
+      const loaded = await fetchGroup(config.apiBaseUrl, material.accessToken, id);
       setToken(material.accessToken);
       setGroup(loaded);
-      setMemberId(profile?.memberId ?? null);
+      try {
+        const profile = await fetchMemberProfile(config.apiBaseUrl, material.accessToken);
+        setMemberId(profile?.memberId ?? null);
+      } catch {
+        setMemberId(null);
+      }
     } catch {
       setError('We could not load this group.');
     }
@@ -69,9 +71,11 @@ export default function GroupDetailScreen() {
     try {
       setGroup(await action());
     } catch (failure) {
-      if (failure instanceof GroupHttpError && failure.status === 409) {
-        setError('The group changed. Refreshing the latest state.');
+      if (failure instanceof GroupHttpError && failure.code === 'stale_version') {
         await refresh();
+        setError('The group changed. Refreshed the latest state.');
+      } else if (failure instanceof GroupHttpError && failure.code === 'last_admin') {
+        setError('A group must keep at least one active Admin.');
       } else {
         setError('The action failed. Try again.');
       }
@@ -112,7 +116,7 @@ export default function GroupDetailScreen() {
             key={membership.memberId}
             membership={membership}
             isSelf={membership.memberId === memberId}
-            canManage={Boolean(isAdmin) && !busy}
+            canManage={Boolean(isAdmin) && group.state === 'ACTIVE' && !busy}
             onActivate={() => token
               ? void run(() => activateMember(config.apiBaseUrl, token, group.id, membership.memberId, group.version))
               : undefined}

@@ -22,6 +22,8 @@ import { createDevAccessToken, readAppSubject } from '../src/token';
 const config = createAppConfig(process.env);
 const BOOTING: SessionState = { kind: 'booting', ledgerAvailable: false };
 const DEV = process.env.NODE_ENV !== 'production';
+const DEV_ADMIN_SUBJECT = 'aps_dev_0123456789012345678901';
+const DEV_MEMBER_SUBJECT = 'aps_member_012345678901234567890';
 
 type Failure = { kind: 'offline' | 'contract'; message: string };
 
@@ -199,10 +201,9 @@ export default function HomeScreen() {
     apply({ type: 'logoutCompleted' });
   }, [apply]);
 
-  const startDevSession = useCallback(async () => {
+  const startDevSession = useCallback(async (subject = DEV_ADMIN_SUBJECT) => {
     if (!DEV || !config.devSession) return;
-    const token = createDevAccessToken();
-    const subject = readAppSubject(token);
+    const token = createDevAccessToken(subject);
     await sessionStore.save({ accessToken: token, refreshToken: '', identityId: subject });
     accessToken.current = token;
     expectedSubject.current = subject;
@@ -224,7 +225,8 @@ export default function HomeScreen() {
           message={message}
           onSignIn={signIn}
           devSession={DEV && config.devSession}
-          onDevSession={startDevSession}
+          onDevSession={() => void startDevSession()}
+          onDevMember={() => void startDevSession(DEV_MEMBER_SUBJECT)}
         />
       ) : null}
       {!contractFailure && screen === 'profileRequired' ? (
@@ -268,13 +270,15 @@ function SignedOut({
   message,
   onSignIn,
   devSession,
-  onDevSession
+  onDevSession,
+  onDevMember
 }: {
   busy: boolean;
   message: string | null;
   onSignIn: () => void;
   devSession: boolean;
   onDevSession: () => void;
+  onDevMember: () => void;
 }) {
   return (
     <View style={styles.centered}>
@@ -288,9 +292,14 @@ function SignedOut({
         <Text style={styles.primaryLabel}>{busy ? 'Opening…' : 'Sign in'}</Text>
       </Pressable>
       {devSession ? (
-        <Pressable accessibilityRole="button" onPress={onDevSession} style={styles.quiet}>
-          <Text style={styles.quietLabel}>Use test identity</Text>
-        </Pressable>
+        <>
+          <Pressable accessibilityRole="button" onPress={onDevSession} style={styles.quiet}>
+            <Text style={styles.quietLabel}>Use test identity</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onDevMember} style={styles.quiet}>
+            <Text style={styles.quietLabel}>Use member identity</Text>
+          </Pressable>
+        </>
       ) : null}
     </View>
   );

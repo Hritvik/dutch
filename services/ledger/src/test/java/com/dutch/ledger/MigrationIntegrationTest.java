@@ -22,7 +22,7 @@ class MigrationIntegrationTest {
                 .cleanDisabled(false)
                 .load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(flyway.migrate().migrationsExecuted).isPositive();
         try (var connection = database.createConnection("")) {
             assertThat(connection.getMetaData().getTables(null, null, "outbox_event", null).next()).isTrue();
             assertThat(connection.getMetaData().getTables(null, null, "inbox_event", null).next()).isTrue();

@@ -1,5 +1,6 @@
 package com.dutch.ledger;
 
+import com.dutch.ledger.group.ConcurrentGroupUpdateException;
 import com.dutch.ledger.group.Group;
 import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
@@ -37,22 +38,40 @@ public class TestGroupConfiguration {
         return subject -> Optional.ofNullable(MEMBERS.get(subject));
     }
 
-    static final class InMemoryGroupRepository implements GroupRepository {
+    public static final class InMemoryGroupRepository implements GroupRepository {
         private final Map<GroupId, Group> groups = new ConcurrentHashMap<>();
 
         @Override
         public Optional<Group> findById(GroupId id) {
-            return Optional.ofNullable(groups.get(id));
+            Group stored = groups.get(id);
+            return stored == null ? Optional.empty() : Optional.of(copy(stored));
         }
 
         @Override
         public List<Group> findReadableBy(MemberId memberId) {
-            return groups.values().stream().filter(group -> group.canRead(memberId)).toList();
+            return groups.values().stream()
+                    .filter(group -> group.canRead(memberId))
+                    .map(TestGroupConfiguration::copy)
+                    .toList();
         }
 
         @Override
-        public void save(Group group) {
-            groups.put(group.id(), group);
+        public void saveNew(Group group) {
+            groups.put(group.id(), copy(group));
         }
+
+        @Override
+        public void save(Group group, long expectedVersion) {
+            Group stored = groups.get(group.id());
+            if (stored == null || stored.version() != expectedVersion) {
+                throw new ConcurrentGroupUpdateException();
+            }
+            groups.put(group.id(), copy(group));
+        }
+    }
+
+    private static Group copy(Group group) {
+        return Group.restore(group.id(), group.name(), group.currency(), group.state(),
+                group.version(), group.memberships());
     }
 }

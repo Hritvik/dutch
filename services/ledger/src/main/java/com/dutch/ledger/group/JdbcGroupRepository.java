@@ -63,19 +63,32 @@ public class JdbcGroupRepository implements GroupRepository {
 
     @Override
     @Transactional
-    public void save(Group group) {
+    public void saveNew(Group group) {
         jdbc.update("""
                 INSERT INTO member_group
                     (group_id, name, currency, state, aggregate_version, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, now(), now())
-                ON CONFLICT (group_id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    currency = EXCLUDED.currency,
-                    state = EXCLUDED.state,
-                    aggregate_version = EXCLUDED.aggregate_version,
-                    updated_at = now()
                 """, group.id().value(), group.name(), group.currency(),
                 group.state().name(), group.version());
+        writeMemberships(group);
+    }
+
+    @Override
+    @Transactional
+    public void save(Group group, long expectedVersion) {
+        int updated = jdbc.update("""
+                UPDATE member_group SET
+                    name = ?, currency = ?, state = ?, aggregate_version = ?, updated_at = now()
+                WHERE group_id = ? AND aggregate_version = ?
+                """, group.name(), group.currency(), group.state().name(), group.version(),
+                group.id().value(), expectedVersion);
+        if (updated == 0) {
+            throw new ConcurrentGroupUpdateException();
+        }
+        writeMemberships(group);
+    }
+
+    private void writeMemberships(Group group) {
         for (Membership membership : group.memberships()) {
             jdbc.update("""
                     INSERT INTO group_membership

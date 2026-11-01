@@ -8,5 +8,11 @@ public interface GroupRepository {
 
     List<Group> findReadableBy(MemberId memberId);
 
-    void save(Group group);
+    void saveNew(Group group);
+
+    /**
+     * Writes only if the stored aggregate version still equals {@code expectedVersion};
+     * otherwise another writer won the race.
+     */
+    void save(Group group, long expectedVersion);
 }

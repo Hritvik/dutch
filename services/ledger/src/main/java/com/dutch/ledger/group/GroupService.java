@@ -19,7 +19,7 @@ public class GroupService {
     public GroupView create(String appSubject, String name, String currency) {
         MemberId creator = requireMember(appSubject);
         Group group = Group.create(newGroupId(), name, currency, creator, Instant.now());
-        groups.save(group);
+        groups.saveNew(group);
         return group.view();
     }
 
@@ -36,16 +36,18 @@ public class GroupService {
     public GroupView invite(String appSubject, String groupId, String invitee, GroupRole role) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        long expected = group.version();
         group.invite(actor, new MemberId(invitee), role, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 
     public GroupView addPlaceholder(String appSubject, String groupId, String placeholder, GroupRole role) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        long expected = group.version();
         group.addPlaceholder(actor, new MemberId(placeholder), role, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 
@@ -56,8 +58,9 @@ public class GroupService {
         if (!actor.equals(target)) {
             requireAdmin(actor, group);
         }
+        long expected = group.version();
         group.activate(actor, target, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 
@@ -68,32 +71,36 @@ public class GroupService {
         if (!actor.equals(target)) {
             requireAdmin(actor, group);
         }
+        long expected = group.version();
         group.deactivate(actor, target, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 
     public GroupView changeRole(String appSubject, String groupId, String memberId, GroupRole role) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        long expected = group.version();
         group.changeRole(actor, new MemberId(memberId), role, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 
     public GroupView archive(String appSubject, String groupId) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        long expected = group.version();
         group.archive(actor, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 
     public GroupView reopen(String appSubject, String groupId) {
         MemberId actor = requireMember(appSubject);
         Group group = requireAdmin(actor, groupId);
+        long expected = group.version();
         group.reopen(actor, Instant.now());
-        groups.save(group);
+        groups.save(group, expected);
         return group.view();
     }
 

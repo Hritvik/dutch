@@ -10,6 +10,9 @@ import com.dutch.ledger.expense.ExpenseCorrection;
 import com.dutch.ledger.expense.ExpenseId;
 import com.dutch.ledger.expense.ExpenseRepository;
 import com.dutch.ledger.expense.IdempotencyStore;
+import com.dutch.ledger.direct.DirectExpense;
+import com.dutch.ledger.direct.DirectExpenseRepository;
+import com.dutch.ledger.direct.DirectScope;
 import com.dutch.ledger.expense.ObligationEntry;
 import com.dutch.ledger.settlement.Settlement;
 import com.dutch.ledger.settlement.SettlementId;
@@ -18,6 +21,7 @@ import com.dutch.ledger.settlement.SettlementVoid;
 import com.dutch.ledger.group.Group;
 import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
+import com.dutch.ledger.group.MemberDirectory;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
 import java.util.List;
@@ -63,6 +67,13 @@ public class TestGroupConfiguration {
     }
 
     @Bean
+    @Primary
+    MemberDirectory memberDirectory() {
+        java.util.Set<MemberId> active = java.util.Set.of(ADMIN, MEMBER, OUTSIDER);
+        return active::contains;
+    }
+
+    @Bean
     JdbcTemplate jdbcTemplate() {
         return Mockito.mock(JdbcTemplate.class);
     }
@@ -95,6 +106,12 @@ public class TestGroupConfiguration {
     @Primary
     SettlementRepository settlementRepository() {
         return new InMemorySettlementRepository();
+    }
+
+    @Bean
+    @Primary
+    DirectExpenseRepository directExpenseRepository() {
+        return new InMemoryDirectExpenseRepository();
     }
 
     @Bean
@@ -174,6 +191,30 @@ public class TestGroupConfiguration {
         @Override
         public java.util.List<ActivityEntry> forScope(String scopeId) {
             return entries.stream().filter(entry -> entry.scopeId().equals(scopeId)).toList();
+        }
+    }
+
+    static final class InMemoryDirectExpenseRepository implements DirectExpenseRepository {
+        private final java.util.List<DirectExpense> saved = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void save(DirectExpense expense) {
+            saved.add(expense);
+        }
+
+        @Override
+        public Optional<DirectExpense> find(com.dutch.ledger.expense.ExpenseId id) {
+            return saved.stream()
+                    .filter(expense -> expense.id().equals(id))
+                    .max(java.util.Comparator.comparingLong(DirectExpense::revision));
+        }
+
+        @Override
+        public java.util.List<String> streamIds(com.dutch.ledger.expense.ExpenseId id) {
+            return find(id).map(expense -> expense.obligationEntries().stream()
+                    .map(entry -> DirectScope.streamId(entry.debtor(), entry.creditor(),
+                            expense.currency()))
+                    .distinct().sorted().toList()).orElse(java.util.List.of());
         }
     }
 

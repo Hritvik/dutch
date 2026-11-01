@@ -382,6 +382,76 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/direct-expenses:
+    post:
+      operationId: createDirectExpense
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+      responses:
+        "200":
+          description: The recorded Direct Expense, its entries, and its pair streams.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectExpenseResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/direct-expenses/{expenseId}:
+    get:
+      operationId: getDirectExpense
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ExpenseId"
+      responses:
+        "200":
+          description: The Direct Expense visible to an involved member.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectExpenseResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /api/v1/direct-expenses/{expenseId}/activity:
+    get:
+      operationId: listDirectExpenseActivity
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ExpenseId"
+      responses:
+        "200":
+          description: The Direct Expense Activity visible to an involved member.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/v1/groups/{groupId}/activity:
     get:
       operationId: listActivity
@@ -997,6 +1067,73 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SettlementView"
+    DirectExpenseView:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - description
+        - totalMinorUnits
+        - currency
+        - splitMethod
+        - payers
+        - shares
+        - entries
+        - streamIds
+        - occurredAt
+        - revision
+      properties:
+        id:
+          type: string
+          pattern: ^exp_[A-Za-z0-9_-]{16,128}$
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
+        totalMinorUnits:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        splitMethod:
+          type: string
+          enum:
+            - EQUAL
+            - EXACT
+            - PERCENTAGE
+        payers:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberAmount"
+        shares:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberAmount"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObligationEntryView"
+        streamIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: ^direct:[A-Za-z0-9_-]{16,128}:[A-Za-z0-9_-]{16,128}:[A-Z]{3}$
+        occurredAt:
+          type: string
+          format: date-time
+        revision:
+          type: integer
+          minimum: 1
+    DirectExpenseResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/DirectExpenseView"
     ActivityAction:
       type: string
       enum:

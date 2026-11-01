@@ -34,6 +34,8 @@ public class LedgerSecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/api/v1/groups/**").authenticated()
+                        .requestMatchers("/api/v1/direct-expenses/**").authenticated()
+                        .requestMatchers("/api/v1/series/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .exceptionHandling(exceptions -> exceptions

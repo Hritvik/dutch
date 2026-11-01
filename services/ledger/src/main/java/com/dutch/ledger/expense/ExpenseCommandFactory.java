@@ -13,6 +13,23 @@ public final class ExpenseCommandFactory {
     }
 
     public static Expense create(Group group, ExpenseId id, long revision, CreateExpenseRequest request) {
+        requireBasics(request);
+        if (!group.currency().equals(request.currency())) {
+            throw new IllegalArgumentException("currency must match the group currency");
+        }
+        List<PayerContribution> payers = payers(request);
+        Allocation allocation = allocation(request);
+        for (MemberId member : involved(payers, allocation)) {
+            if (!group.canBeAllocated(member)) {
+                throw new IllegalArgumentException("a payer or participant is not allocatable in this group");
+            }
+        }
+        return Expense.createAtRevision(id, group.id(), request.description(), request.totalMinorUnits(),
+                request.currency(), request.splitMethod(), payers, allocation.shares(),
+                request.occurredAt(), revision);
+    }
+
+    public static void requireBasics(CreateExpenseRequest request) {
         if (request.occurredAt() == null) {
             throw new IllegalArgumentException("occurredAt is required");
         }
@@ -25,10 +42,10 @@ public final class ExpenseCommandFactory {
         if (request.payers() == null) {
             throw new IllegalArgumentException("payers are required");
         }
-        if (!group.currency().equals(request.currency())) {
-            throw new IllegalArgumentException("currency must match the group currency");
-        }
-        List<PayerContribution> payers = request.payers().stream()
+    }
+
+    public static List<PayerContribution> payers(CreateExpenseRequest request) {
+        return request.payers().stream()
                 .map(payer -> {
                     if (payer == null || payer.memberId() == null) {
                         throw new IllegalArgumentException("payer memberId is required");
@@ -36,12 +53,15 @@ public final class ExpenseCommandFactory {
                     return new PayerContribution(new MemberId(payer.memberId()), payer.minorUnits());
                 })
                 .toList();
+    }
+
+    public static Allocation allocation(CreateExpenseRequest request) {
         List<MemberId> participants = request.participants() == null ? List.of()
                 : request.participants().stream().map(MemberId::new).toList();
         if (request.splitMethod() == null) {
             throw new IllegalArgumentException("splitMethod is required");
         }
-        Allocation allocation = switch (request.splitMethod()) {
+        return switch (request.splitMethod()) {
             case EQUAL -> Allocation.equal(request.totalMinorUnits(), request.currency(), participants);
             case EXACT -> {
                 if (request.exactShares() == null) {
@@ -66,16 +86,12 @@ public final class ExpenseCommandFactory {
                         participants, request.percentageBasisPoints());
             }
         };
+    }
+
+    public static Set<MemberId> involved(List<PayerContribution> payers, Allocation allocation) {
         Set<MemberId> involved = new HashSet<>();
         payers.forEach(payer -> involved.add(payer.memberId()));
         allocation.shares().forEach(share -> involved.add(share.memberId()));
-        for (MemberId member : involved) {
-            if (!group.canBeAllocated(member)) {
-                throw new IllegalArgumentException("a payer or participant is not allocatable in this group");
-            }
-        }
-        return Expense.createAtRevision(id, group.id(), request.description(), request.totalMinorUnits(),
-                request.currency(), request.splitMethod(), payers, allocation.shares(),
-                request.occurredAt(), revision);
+        return involved;
     }
 }

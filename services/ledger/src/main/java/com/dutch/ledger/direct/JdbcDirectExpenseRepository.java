@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Appends a Direct Expense revision and its per-pair direct-stream entries. */
 @Repository
-public class JdbcDirectExpenseRepository {
+public class JdbcDirectExpenseRepository implements DirectExpenseRepository {
 
     private final JdbcTemplate jdbc;
     private final FinancialStreams streams;
@@ -29,6 +29,7 @@ public class JdbcDirectExpenseRepository {
         this.streams = new FinancialStreams(jdbc);
     }
 
+    @Override
     @Transactional
     public void save(DirectExpense expense) {
         jdbc.update("""
@@ -83,6 +84,7 @@ public class JdbcDirectExpenseRepository {
         }
     }
 
+    @Override
     public Optional<DirectExpense> find(ExpenseId id) {
         List<DirectRevisionRow> rows = jdbc.query("""
                 SELECT revision, description, total_minor_units, currency, split_method, occurred_at
@@ -119,6 +121,7 @@ public class JdbcDirectExpenseRepository {
     }
 
     /** The direct-pair streams currently holding entries for this expense. */
+    @Override
     public List<String> streamIds(ExpenseId id) {
         return new ArrayList<>(jdbc.queryForList("""
                 SELECT DISTINCT stream_id FROM obligation_entry

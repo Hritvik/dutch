@@ -15,7 +15,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = {ExpenseController.class, CorrectionController.class, ActivityController.class, com.dutch.ledger.settlement.SettlementController.class})
+@RestControllerAdvice(assignableTypes = {ExpenseController.class, CorrectionController.class, ActivityController.class, com.dutch.ledger.settlement.SettlementController.class, com.dutch.ledger.direct.DirectExpenseController.class})
 final class ExpenseErrorHandler {
 
     @ExceptionHandler(GroupAccessDeniedException.class)

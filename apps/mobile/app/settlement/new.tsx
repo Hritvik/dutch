@@ -153,7 +153,7 @@ export default function NewSettlementScreen() {
       setResult(await voidSettlement(config.apiBaseUrl, token, group.id, result.id, key));
       setConfirmVoid(false);
     } catch (failure) {
-      voidKey.current = null;
+      // Keep the key so an ambiguous failure replays the same void.
       if (failure instanceof SettlementHttpError && failure.code === 'conflict') {
         setError('This settlement was already voided.');
       } else {

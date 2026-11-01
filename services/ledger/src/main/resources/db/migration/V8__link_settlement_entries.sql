@@ -15,6 +15,9 @@ ALTER TABLE obligation_entry
     ADD CONSTRAINT obligation_entry_entry_kind_check
         CHECK (entry_kind IN ('CHARGE', 'REVERSAL', 'SETTLEMENT', 'SETTLEMENT_VOID'));
 
+CREATE INDEX activity_entry_scope_idx
+    ON activity_entry (scope_id, occurred_at DESC, activity_id DESC);
+
 CREATE UNIQUE INDEX obligation_entry_settlement_pair
     ON obligation_entry (settlement_id, stream_id, debtor_member_id, creditor_member_id)
     WHERE settlement_id IS NOT NULL;

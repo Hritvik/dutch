@@ -14,3 +14,8 @@ roles; it is not connected to AWS and contains no production credentials.
 `./bin/reset.sh` destroys only the `dutch-local` Compose volume and recreates the
 container and its deterministic service databases. Use it when a fixture needs a
 clean database; it does not access cloud resources.
+
+The gateway validates bearer tokens against `GATEWAY_IAM_ISSUER_URI` and forwards
+`/api/v1/me` to `GATEWAY_UMS_BASE_URL` and `/api/v1/ledger` to
+`GATEWAY_LEDGER_BASE_URL`. It intentionally fails to start without an issuer; there
+is no insecure default.

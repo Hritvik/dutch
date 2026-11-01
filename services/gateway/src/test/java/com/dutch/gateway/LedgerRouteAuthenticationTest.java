@@ -29,6 +29,7 @@ class LedgerRouteAuthenticationTest {
         mockMvc.perform(get("/api/v1/ledger/home"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().exists(CorrelationId.HEADER))
+                .andExpect(header().string("WWW-Authenticate", "Bearer"))
                 .andExpect(jsonPath("$.error.code").value("unauthorized"))
                 .andExpect(jsonPath("$.error.message").value("Authentication is required"))
                 .andExpect(jsonPath("$.error.correlationId").exists());

@@ -8,9 +8,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -63,7 +65,7 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
         String correlationId = CorrelationId.resolve(request.getHeader(CorrelationId.HEADER));
         response.setHeader(CorrelationId.HEADER, correlationId);
 
-        if (request.getRequestURI().contains("..")) {
+        if (hasTraversal(request.getRequestURI())) {
             writeError(response, 400, "invalid_request", "Request is invalid", correlationId);
             return;
         }
@@ -134,6 +136,14 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
                 throw new UncheckedIOException(exception);
             }
         });
+    }
+
+    private static boolean hasTraversal(String rawPath) {
+        try {
+            return URLDecoder.decode(rawPath, StandardCharsets.UTF_8).contains("..");
+        } catch (IllegalArgumentException exception) {
+            return true;
+        }
     }
 
     private static Set<String> connectionTokens(String header) {

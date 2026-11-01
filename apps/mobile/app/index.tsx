@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const accessToken = useRef<string | null>(null);
+  const expectedSubject = useRef<string | null>(null);
 
   const apply = useCallback((event: Parameters<typeof reduceSessionState>[1]) => {
     setSession((current) => reduceSessionState(current, event));
@@ -41,6 +42,7 @@ export default function HomeScreen() {
   const expireSession = useCallback(async (reason: string) => {
     await sessionStore.wipe();
     accessToken.current = null;
+    expectedSubject.current = null;
     setProfile(undefined);
     setMemberPending(false);
     setFailure(null);
@@ -51,6 +53,10 @@ export default function HomeScreen() {
 
   const checkProfile = useCallback(async (token: string) => {
     const subject = readAppSubject(token);
+    if (expectedSubject.current && subject !== expectedSubject.current) {
+      await expireSession('Your session changed. Sign in again.');
+      return;
+    }
     try {
       const state = await fetchProfileState(config.apiBaseUrl, token);
       setOnline(true);
@@ -97,6 +103,7 @@ export default function HomeScreen() {
           return;
         }
         accessToken.current = material.accessToken;
+        expectedSubject.current = material.identityId;
         setSession({ kind: 'profileRequired', identityId: material.identityId, ledgerAvailable: false });
         await checkProfile(material.accessToken);
       } catch {
@@ -167,6 +174,7 @@ export default function HomeScreen() {
         identityId: subject
       });
       accessToken.current = tokens.accessToken;
+      expectedSubject.current = subject;
       setProfile(undefined);
       setSession({ kind: 'profileRequired', identityId: subject, ledgerAvailable: false });
       await checkProfile(tokens.accessToken);
@@ -180,6 +188,7 @@ export default function HomeScreen() {
   const signOut = useCallback(async () => {
     await sessionStore.wipe();
     accessToken.current = null;
+    expectedSubject.current = null;
     setProfile(undefined);
     setMemberPending(false);
     setFailure(null);
@@ -194,6 +203,7 @@ export default function HomeScreen() {
     const subject = readAppSubject(token);
     await sessionStore.save({ accessToken: token, refreshToken: '', identityId: subject });
     accessToken.current = token;
+    expectedSubject.current = subject;
     setProfile(undefined);
     setSession({ kind: 'profileRequired', identityId: subject, ledgerAvailable: false });
     await checkProfile(token);
@@ -223,7 +233,7 @@ export default function HomeScreen() {
           onSignOut={signOut}
         />
       ) : null}
-      {screen === 'profiling' ? <Loading label="Finishing your profile" /> : null}
+      {!contractFailure && screen === 'profiling' ? <Loading label="Finishing your profile" /> : null}
       {screen === 'offline' ? (
         <Offline message={failure?.message ?? message} onRetry={retry} onSignOut={signOut} />
       ) : null}

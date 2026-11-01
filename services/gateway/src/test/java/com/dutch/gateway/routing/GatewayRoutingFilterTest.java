@@ -25,7 +25,16 @@ class GatewayRoutingFilterTest {
 
     @Test
     void rejects_a_traversal_path_before_calling_upstream() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/me/../secret");
+        assertRejected("/api/v1/me/../secret");
+    }
+
+    @Test
+    void rejects_an_encoded_traversal_path() throws Exception {
+        assertRejected("/api/v1/me/%2e%2e/secret");
+    }
+
+    private void assertRejected(String path) throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, new MockFilterChain());

@@ -45,10 +45,13 @@ public class GatewaySecurityConfiguration {
 
     @Bean
     AuthenticationEntryPoint authenticationEntryPoint(ObjectMapper objectMapper) {
-        return (request, response, exception) -> writeError(
-                response, objectMapper, HttpStatus.UNAUTHORIZED,
-                "unauthorized", "Authentication is required",
-                CorrelationId.resolve(request.getHeader(CorrelationId.HEADER)));
+        return (request, response, exception) -> {
+            response.setHeader("WWW-Authenticate", "Bearer");
+            writeError(
+                    response, objectMapper, HttpStatus.UNAUTHORIZED,
+                    "unauthorized", "Authentication is required",
+                    CorrelationId.resolve(request.getHeader(CorrelationId.HEADER)));
+        };
     }
 
     @Bean

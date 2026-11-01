@@ -1,0 +1,15 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- assertVisible: "Setting up your profile."
+- assertVisible: "Check again"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- assertVisible: "mem_dev_012345678901234567"
+- assertVisible: "Ledger access active"
+- tapOn: "Sign out"
+- assertVisible: "Share costs without losing the plot."

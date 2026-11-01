@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { readAppSubject } from './token';
+import { createDevAccessToken, readAppSubject } from './token';
 
 function token(payload: Record<string, unknown>): string {
   const encode = (value: Record<string, unknown>) =>
@@ -11,6 +11,11 @@ function token(payload: Record<string, unknown>): string {
 
 test('reads the app-scoped subject from a token payload', () => {
   assert.equal(readAppSubject(token({ sub: 'aps_0123456789012345678901ab' })), 'aps_0123456789012345678901ab');
+});
+
+test('round-trips the development token subject without Node or DOM globals', () => {
+  assert.equal(readAppSubject(createDevAccessToken()), 'aps_dev_0123456789012345');
+  assert.equal(readAppSubject(createDevAccessToken('aps_custom')), 'aps_custom');
 });
 
 test('rejects a token without a usable subject', () => {

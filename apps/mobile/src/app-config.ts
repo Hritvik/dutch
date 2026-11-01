@@ -1,6 +1,7 @@
 export type DutchAppConfig = {
   apiBaseUrl: string;
   issuer: string | null;
+  devSession: boolean;
 };
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8080';
@@ -18,6 +19,7 @@ export function createAppConfig(env: Record<string, string | undefined>): DutchA
   const issuerValue = env.EXPO_PUBLIC_IAM_ISSUER;
   return {
     apiBaseUrl: parseBaseUrl(env.EXPO_PUBLIC_DUTCH_API_URL, 'EXPO_PUBLIC_DUTCH_API_URL'),
-    issuer: issuerValue && issuerValue.length > 0 ? issuerValue : null
+    issuer: issuerValue && issuerValue.length > 0 ? issuerValue : null,
+    devSession: env.EXPO_PUBLIC_DEV_SESSION === '1'
   };
 }

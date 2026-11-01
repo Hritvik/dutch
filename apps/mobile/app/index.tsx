@@ -10,7 +10,7 @@ import { loadMobileAuthorizationRequest } from '../src/oauth-client';
 import { validateAuthorizationRedirect } from '../src/oauth-redirect';
 import { fetchMemberProfile, fetchProfileState, type ProfileStateResult } from '../src/profile-client';
 import { initialSessionState, reduceSessionState, type SessionState } from '../src/session-state';
-import { readAppSubject } from '../src/token';
+import { createDevAccessToken, readAppSubject } from '../src/token';
 
 const config = createAppConfig(process.env);
 const BOOTING: SessionState = { kind: 'booting', ledgerAvailable: false };
@@ -143,6 +143,16 @@ export default function HomeScreen() {
     apply({ type: 'logoutCompleted' });
   }, [apply]);
 
+  const startDevSession = useCallback(async () => {
+    const token = createDevAccessToken();
+    const subject = readAppSubject(token);
+    await sessionStore.save({ accessToken: token, refreshToken: '', identityId: subject });
+    accessToken.current = token;
+    setProfile(undefined);
+    setSession({ kind: 'profileRequired', identityId: subject, ledgerAvailable: false });
+    await checkProfile(token);
+  }, [checkProfile]);
+
   const screen = screenFor({ session, profile, online });
 
   return (
@@ -150,7 +160,13 @@ export default function HomeScreen() {
       <StatusBar style="dark" />
       {screen === 'loading' ? <Loading /> : null}
       {screen === 'signedOut' ? (
-        <SignedOut busy={busy} message={message} onSignIn={signIn} />
+        <SignedOut
+          busy={busy}
+          message={message}
+          onSignIn={signIn}
+          devSession={config.devSession}
+          onDevSession={startDevSession}
+        />
       ) : null}
       {screen === 'profileRequired' ? (
         <ProfileRequired
@@ -178,7 +194,19 @@ function Loading({ label = 'Loading Dutch' }: { label?: string }) {
   );
 }
 
-function SignedOut({ busy, message, onSignIn }: { busy: boolean; message: string | null; onSignIn: () => void }) {
+function SignedOut({
+  busy,
+  message,
+  onSignIn,
+  devSession,
+  onDevSession
+}: {
+  busy: boolean;
+  message: string | null;
+  onSignIn: () => void;
+  devSession: boolean;
+  onDevSession: () => void;
+}) {
   return (
     <View style={styles.centered}>
       <Text style={styles.eyebrow}>Dutch</Text>
@@ -190,6 +218,11 @@ function SignedOut({ busy, message, onSignIn }: { busy: boolean; message: string
       <Pressable accessibilityRole="button" disabled={busy} onPress={onSignIn} style={styles.primary}>
         <Text style={styles.primaryLabel}>{busy ? 'Opening…' : 'Sign in'}</Text>
       </Pressable>
+      {devSession ? (
+        <Pressable accessibilityRole="button" onPress={onDevSession} style={styles.quiet}>
+          <Text style={styles.quietLabel}>Use test identity</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

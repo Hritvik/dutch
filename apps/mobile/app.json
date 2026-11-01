@@ -6,6 +6,13 @@
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.dutch.mobile",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.dutch.mobile"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store"

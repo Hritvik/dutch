@@ -6,7 +6,8 @@ import { createAppConfig } from './app-config';
 test('defaults the API base URL and leaves the issuer unset', () => {
   assert.deepEqual(createAppConfig({}), {
     apiBaseUrl: 'http://localhost:8080',
-    issuer: null
+    issuer: null,
+    devSession: false
   });
 });
 
@@ -27,4 +28,9 @@ test('keeps an explicit issuer for the PKCE request', () => {
     createAppConfig({ EXPO_PUBLIC_IAM_ISSUER: 'https://iam.example.test' }).issuer,
     'https://iam.example.test'
   );
+});
+
+test('enables the dev session only for the exact opt-in flag', () => {
+  assert.equal(createAppConfig({ EXPO_PUBLIC_DEV_SESSION: '1' }).devSession, true);
+  assert.equal(createAppConfig({ EXPO_PUBLIC_DEV_SESSION: 'true' }).devSession, false);
 });

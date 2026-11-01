@@ -22,6 +22,7 @@ import com.dutch.ledger.group.GroupRuleException;
 import com.dutch.ledger.group.MemberDirectory;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -55,12 +56,14 @@ public class SeriesService {
     private final DirectExpenseService directExpenses;
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
+    private final SyncJournal journal;
     private final ObjectMapper objectMapper;
 
     public SeriesService(SeriesRepository series, GroupRepository groups, MemberResolver members,
                          MemberDirectory directory, ExpenseService expenses,
                          DirectExpenseService directExpenses, IdempotencyStore idempotency,
-                         ActivityRepository activity, ObjectMapper objectMapper) {
+                         ActivityRepository activity, SyncJournal journal,
+                         ObjectMapper objectMapper) {
         this.series = series;
         this.groups = groups;
         this.members = members;
@@ -69,6 +72,7 @@ public class SeriesService {
         this.directExpenses = directExpenses;
         this.idempotency = idempotency;
         this.activity = activity;
+        this.journal = journal;
         this.objectMapper = objectMapper;
     }
 
@@ -107,6 +111,8 @@ public class SeriesService {
                 "cadence", created.cadence().name(),
                 "scopeType", created.scope().type().name()));
         SeriesView view = SeriesView.from(created);
+        journal.append(recipients(created), "SERIES", created.id().value(), "upsert",
+                created.version(), objectMapper.convertValue(view, Map.class), null, now);
         idempotency.complete(actor.value(), CREATE, idempotencyKey, serialize(view));
         return view;
     }
@@ -177,6 +183,8 @@ public class SeriesService {
                 "periodEnd", occurrence.periodEnd().toString(),
                 "status", occurrence.status().name()));
         OccurrenceView view = OccurrenceView.from(occurrence);
+        journal.append(recipients(found), "OCCURRENCE", occurrence.id().value(), "upsert",
+                found.version(), objectMapper.convertValue(view, Map.class), null, Instant.now());
         idempotency.complete(actor.value(), GENERATE, idempotencyKey, serialize(view));
         return view;
     }
@@ -208,6 +216,8 @@ public class SeriesService {
                 "periodStart", skipped.periodStart().toString(),
                 "status", skipped.status().name()));
         OccurrenceView view = OccurrenceView.from(skipped);
+        journal.append(recipients(found), "OCCURRENCE", skipped.id().value(), "upsert",
+                found.version(), objectMapper.convertValue(view, Map.class), null, Instant.now());
         idempotency.complete(actor.value(), SKIP, idempotencyKey, serialize(view));
         return view;
     }
@@ -254,6 +264,9 @@ public class SeriesService {
 
         SeriesSubmitResult result = new SeriesSubmitResult(
                 OccurrenceView.from(submitted), expenseId);
+        journal.append(recipients(found), "OCCURRENCE", submitted.id().value(), "upsert",
+                found.version(), objectMapper.convertValue(OccurrenceView.from(submitted), Map.class),
+                null, Instant.now());
         idempotency.complete(actor.value(), SUBMIT, idempotencyKey, serialize(result));
         return result;
     }
@@ -293,6 +306,8 @@ public class SeriesService {
         };
         appendActivity(changed, actor, activityAction, Map.of("status", changed.status().name()));
         SeriesView view = SeriesView.from(changed);
+        journal.append(recipients(changed), "SERIES", changed.id().value(), "upsert",
+                changed.version(), objectMapper.convertValue(view, Map.class), null, Instant.now());
         idempotency.complete(actor.value(), STATUS, idempotencyKey, serialize(view));
         return view;
     }
@@ -423,6 +438,18 @@ public class SeriesService {
         activity.append(new ActivityEntry("act_" + UUID.randomUUID().toString().replace("-", ""),
                 scopeId(found), actor, action, found.id().value(), found.version(), Instant.now(),
                 details));
+    }
+
+    private List<MemberId> recipients(RecurringSeries found) {
+        if (found.scope().type() == SeriesScope.ScopeType.DIRECT) {
+            return found.scope().memberIds();
+        }
+        return groups.findById(found.scope().groupId())
+                .map(group -> group.memberships().stream()
+                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .map(com.dutch.ledger.group.Membership::memberId)
+                        .toList())
+                .orElse(List.of());
     }
 
     static String scopeId(RecurringSeries series) {

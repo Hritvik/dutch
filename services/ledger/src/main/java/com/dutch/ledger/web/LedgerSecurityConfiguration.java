@@ -36,6 +36,7 @@ public class LedgerSecurityConfiguration {
                         .requestMatchers("/api/v1/groups/**").authenticated()
                         .requestMatchers("/api/v1/direct-expenses/**").authenticated()
                         .requestMatchers("/api/v1/series/**").authenticated()
+                        .requestMatchers("/api/v1/ledger/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .exceptionHandling(exceptions -> exceptions

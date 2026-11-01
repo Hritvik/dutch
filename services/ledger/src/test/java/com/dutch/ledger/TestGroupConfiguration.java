@@ -19,6 +19,8 @@ import com.dutch.ledger.series.PendingOccurrence;
 import com.dutch.ledger.series.RecurringSeries;
 import com.dutch.ledger.series.SeriesId;
 import com.dutch.ledger.series.SeriesRepository;
+import com.dutch.ledger.sync.SyncChange;
+import com.dutch.ledger.sync.SyncJournal;
 import com.dutch.ledger.settlement.Settlement;
 import com.dutch.ledger.settlement.SettlementId;
 import com.dutch.ledger.settlement.SettlementRepository;
@@ -126,6 +128,12 @@ public class TestGroupConfiguration {
     }
 
     @Bean
+    @Primary
+    SyncJournal syncJournal() {
+        return new InMemorySyncJournal();
+    }
+
+    @Bean
     PlatformTransactionManager transactionManager() {
         return new NoOpTransactionManager();
     }
@@ -202,6 +210,51 @@ public class TestGroupConfiguration {
         @Override
         public java.util.List<ActivityEntry> forScope(String scopeId) {
             return entries.stream().filter(entry -> entry.scopeId().equals(scopeId)).toList();
+        }
+    }
+
+    static final class InMemorySyncJournal implements SyncJournal {
+        private final Map<MemberId, java.util.List<SyncChange>> changes = new ConcurrentHashMap<>();
+
+        @Override
+        public synchronized void append(java.util.Collection<MemberId> recipients,
+                                        String resourceType, String resourceId,
+                                        String operation, long resourceVersion,
+                                        Map<String, Object> payload, String actionId,
+                                        java.time.Instant occurredAt) {
+            for (MemberId recipient : recipients) {
+                java.util.List<SyncChange> list =
+                        changes.computeIfAbsent(recipient, key -> new CopyOnWriteArrayList<>());
+                list.add(new SyncChange(list.size() + 1L, resourceType, resourceId, operation,
+                        resourceVersion, payload, actionId, "1", occurredAt));
+            }
+        }
+
+        @Override
+        public java.util.List<SyncChange> after(MemberId recipient, long sequence, int limit) {
+            return changes.getOrDefault(recipient, java.util.List.of()).stream()
+                    .filter(change -> change.sequence() > sequence)
+                    .sorted(java.util.Comparator.comparingLong(SyncChange::sequence))
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public long maxSequence(MemberId recipient) {
+            return changes.getOrDefault(recipient, java.util.List.of()).stream()
+                    .mapToLong(SyncChange::sequence).max().orElse(0);
+        }
+
+        @Override
+        public java.util.List<SyncChange> snapshot(MemberId recipient) {
+            Map<String, SyncChange> latest = new java.util.LinkedHashMap<>();
+            for (SyncChange change : changes.getOrDefault(recipient, java.util.List.of())) {
+                latest.put(change.resourceType() + ":" + change.resourceId(), change);
+            }
+            return latest.values().stream()
+                    .filter(change -> !"tombstone".equals(change.operation()))
+                    .sorted(java.util.Comparator.comparingLong(SyncChange::sequence))
+                    .toList();
         }
     }
 

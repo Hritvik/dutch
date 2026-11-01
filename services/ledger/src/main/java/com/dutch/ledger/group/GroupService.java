@@ -1,25 +1,36 @@
 package com.dutch.ledger.group;
 
+import com.dutch.ledger.sync.SyncJournal;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class GroupService {
 
     private final GroupRepository groups;
     private final MemberResolver members;
+    private final SyncJournal journal;
+    private final ObjectMapper objectMapper;
 
-    public GroupService(GroupRepository groups, MemberResolver members) {
+    public GroupService(GroupRepository groups, MemberResolver members, SyncJournal journal,
+                        ObjectMapper objectMapper) {
         this.groups = groups;
         this.members = members;
+        this.journal = journal;
+        this.objectMapper = objectMapper;
     }
 
     public GroupView create(String appSubject, String name, String currency) {
         MemberId creator = requireMember(appSubject);
         Group group = Group.create(newGroupId(), name, currency, creator, Instant.now());
         groups.saveNew(group);
+        append(group);
         return group.view();
     }
 
@@ -39,8 +50,7 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.invite(actor, new MemberId(invitee), role, Instant.now());
-        groups.save(group, expected);
-        return group.view();
+        return persist(group, expected);
     }
 
     public GroupView addPlaceholder(String appSubject, String groupId, String placeholder, GroupRole role, Long expectedVersion) {
@@ -49,8 +59,7 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.addPlaceholder(actor, new MemberId(placeholder), role, Instant.now());
-        groups.save(group, expected);
-        return group.view();
+        return persist(group, expected);
     }
 
     public GroupView activate(String appSubject, String groupId, String memberId, Long expectedVersion) {
@@ -66,8 +75,7 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.activate(actor, target, Instant.now());
-        groups.save(group, expected);
-        return group.view();
+        return persist(group, expected);
     }
 
     public GroupView deactivate(String appSubject, String groupId, String memberId, Long expectedVersion) {
@@ -80,8 +88,7 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.deactivate(actor, target, Instant.now());
-        groups.save(group, expected);
-        return group.view();
+        return persist(group, expected);
     }
 
     public GroupView changeRole(String appSubject, String groupId, String memberId, GroupRole role, Long expectedVersion) {
@@ -90,8 +97,7 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.changeRole(actor, new MemberId(memberId), role, Instant.now());
-        groups.save(group, expected);
-        return group.view();
+        return persist(group, expected);
     }
 
     public GroupView archive(String appSubject, String groupId, Long expectedVersion) {
@@ -100,8 +106,7 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.archive(actor, Instant.now());
-        groups.save(group, expected);
-        return group.view();
+        return persist(group, expected);
     }
 
     public GroupView reopen(String appSubject, String groupId, Long expectedVersion) {
@@ -110,8 +115,25 @@ public class GroupService {
         requireVersion(group, expectedVersion);
         long expected = group.version();
         group.reopen(actor, Instant.now());
+        return persist(group, expected);
+    }
+
+    protected GroupView persist(Group group, long expected) {
         groups.save(group, expected);
+        append(group);
         return group.view();
+    }
+
+    private void append(Group group) {
+        List<MemberId> recipients = group.memberships().stream()
+                .filter(Membership::hasAppAccess)
+                .map(Membership::memberId)
+                .toList();
+        if (recipients.isEmpty()) {
+            return;
+        }
+        journal.append(recipients, "GROUP", group.id().value(), "upsert", group.version(),
+                objectMapper.convertValue(group.view(), Map.class), null, Instant.now());
     }
 
     private MemberId requireMember(String appSubject) {

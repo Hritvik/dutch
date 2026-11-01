@@ -13,6 +13,7 @@ import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.GroupRuleException;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -37,16 +38,19 @@ public class SettlementService {
     private final MemberResolver members;
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
+    private final SyncJournal journal;
     private final ObjectMapper objectMapper;
 
     public SettlementService(SettlementRepository settlements, GroupRepository groups,
                              MemberResolver members, IdempotencyStore idempotency,
-                             ActivityRepository activity, ObjectMapper objectMapper) {
+                             ActivityRepository activity, SyncJournal journal,
+                             ObjectMapper objectMapper) {
         this.settlements = settlements;
         this.groups = groups;
         this.members = members;
         this.idempotency = idempotency;
         this.activity = activity;
+        this.journal = journal;
         this.objectMapper = objectMapper;
     }
 
@@ -99,6 +103,11 @@ public class SettlementService {
                         "currency", settlement.currency(), "status", "ACTIVE")));
 
         SettlementView view = SettlementView.from(settlement, groupId, "ACTIVE");
+        journal.append(group.memberships().stream()
+                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .map(com.dutch.ledger.group.Membership::memberId).toList(),
+                "SETTLEMENT", settlement.id().value(), "upsert", 1,
+                objectMapper.convertValue(view, java.util.Map.class), null, now);
         idempotency.complete(actor.value(), RECORD_COMMAND, idempotencyKey, serialize(view));
         return view;
     }
@@ -139,6 +148,11 @@ public class SettlementService {
                         "currency", settlement.currency(), "status", "VOIDED")));
 
         SettlementView view = SettlementView.from(settlement, groupId, "VOIDED");
+        journal.append(group.memberships().stream()
+                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .map(com.dutch.ledger.group.Membership::memberId).toList(),
+                "SETTLEMENT", settlement.id().value(), "upsert", 2,
+                objectMapper.convertValue(view, java.util.Map.class), null, now);
         idempotency.complete(actor.value(), VOID_COMMAND, idempotencyKey, serialize(view));
         return view;
     }

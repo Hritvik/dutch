@@ -10,6 +10,7 @@ import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -31,16 +32,18 @@ public class ExpenseService {
     private final MemberResolver members;
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
+    private final SyncJournal journal;
     private final ObjectMapper objectMapper;
 
     public ExpenseService(ExpenseRepository expenses, GroupRepository groups, MemberResolver members,
                           IdempotencyStore idempotency, ActivityRepository activity,
-                          ObjectMapper objectMapper) {
+                          SyncJournal journal, ObjectMapper objectMapper) {
         this.expenses = expenses;
         this.groups = groups;
         this.members = members;
         this.idempotency = idempotency;
         this.activity = activity;
+        this.journal = journal;
         this.objectMapper = objectMapper;
     }
 
@@ -90,6 +93,11 @@ public class ExpenseService {
                 ActivityAction.EXPENSE_CREATED, expense.id().value(), expense.revision(), now,
                 details));
         ExpenseView view = ExpenseView.from(expense);
+        journal.append(group.memberships().stream()
+                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .map(com.dutch.ledger.group.Membership::memberId).toList(),
+                "EXPENSE", expense.id().value(), "upsert", expense.revision(),
+                objectMapper.convertValue(view, java.util.Map.class), null, now);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;
     }

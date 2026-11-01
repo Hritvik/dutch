@@ -15,6 +15,7 @@ import com.dutch.ledger.group.GroupForbiddenException;
 import com.dutch.ledger.group.MemberDirectory;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -38,16 +39,19 @@ public class DirectExpenseService {
     private final MemberDirectory directory;
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
+    private final SyncJournal journal;
     private final ObjectMapper objectMapper;
 
     public DirectExpenseService(DirectExpenseRepository expenses, MemberResolver members,
                                 MemberDirectory directory, IdempotencyStore idempotency,
-                                ActivityRepository activity, ObjectMapper objectMapper) {
+                                ActivityRepository activity, SyncJournal journal,
+                                ObjectMapper objectMapper) {
         this.expenses = expenses;
         this.members = members;
         this.directory = directory;
         this.idempotency = idempotency;
         this.activity = activity;
+        this.journal = journal;
         this.objectMapper = objectMapper;
     }
 
@@ -102,6 +106,8 @@ public class DirectExpenseService {
                 expense.revision(), now, details));
 
         DirectExpenseView view = DirectExpenseView.from(expense);
+        journal.append(involved, "DIRECT_EXPENSE", expense.id().value(), "upsert",
+                expense.revision(), objectMapper.convertValue(view, java.util.Map.class), null, now);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;
     }

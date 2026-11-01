@@ -382,6 +382,77 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/ledger/sync:
+    get:
+      operationId: syncLedger
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque signed cursor; omit to force sync_cursor_expired.
+          schema:
+            type: string
+            maxLength: 2048
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+      responses:
+        "200":
+          description: The caller's next ordered change page.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncPageResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/ledger/sync-snapshots:
+    post:
+      operationId: createSyncSnapshot
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: A 15-minute recipient-bound full-sync snapshot token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncSnapshotResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/ledger/sync-snapshots/{token}:
+    get:
+      operationId: readSyncSnapshot
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 2048
+      responses:
+        "200":
+          description: The caller's current projections and the starting cursor.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncSnapshotPageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /api/v1/series:
     post:
       operationId: createSeries
@@ -945,6 +1016,7 @@ components:
                 - stale_version
                 - last_admin
                 - idempotency_conflict
+                - sync_cursor_expired
                 - service_unavailable
             message:
               type: string
@@ -957,6 +1029,7 @@ components:
                 - The group changed. Refresh and retry.
                 - A group must retain at least one active Admin.
                 - The idempotency key was reused with a different request.
+                - The sync cursor expired. Request a full snapshot.
                 - Service is temporarily unavailable
             correlationId:
               type: string
@@ -1299,6 +1372,123 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/SettlementView"
+    SyncChange:
+      type: object
+      additionalProperties: false
+      required:
+        - sequence
+        - resourceType
+        - resourceId
+        - operation
+        - resourceVersion
+        - payload
+        - schemaVersion
+        - occurredAt
+      properties:
+        sequence:
+          type: integer
+          minimum: 1
+        resourceType:
+          type: string
+          enum:
+            - GROUP
+            - EXPENSE
+            - DIRECT_EXPENSE
+            - SETTLEMENT
+            - ACTIVITY
+            - SERIES
+            - OCCURRENCE
+        resourceId:
+          type: string
+          minLength: 1
+        operation:
+          type: string
+          enum:
+            - upsert
+            - tombstone
+            - access_changed
+            - full_resync_required
+        resourceVersion:
+          type: integer
+          minimum: 0
+        payload:
+          type: object
+        actionId:
+          type:
+            - string
+            - "null"
+        schemaVersion:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+    SyncPage:
+      type: object
+      additionalProperties: false
+      required:
+        - changes
+        - nextCursor
+      properties:
+        changes:
+          type: array
+          maxItems: 200
+          items:
+            $ref: "#/components/schemas/SyncChange"
+        nextCursor:
+          type: string
+    SyncPageResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/SyncPage"
+    SyncSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - asOfSequence
+      properties:
+        token:
+          type: string
+        asOfSequence:
+          type: integer
+          minimum: 0
+    SyncSnapshotResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/SyncSnapshot"
+    SyncSnapshotPage:
+      type: object
+      additionalProperties: false
+      required:
+        - changes
+        - cursor
+        - asOfSequence
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncChange"
+        cursor:
+          type: string
+        asOfSequence:
+          type: integer
+          minimum: 0
+    SyncSnapshotPageResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/SyncSnapshotPage"
     SeriesScopeView:
       type: object
       additionalProperties: false

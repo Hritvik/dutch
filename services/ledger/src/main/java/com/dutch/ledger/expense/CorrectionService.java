@@ -11,6 +11,7 @@ import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,17 +35,20 @@ public class CorrectionService {
     private final IdempotencyStore idempotency;
     private final CorrectionRepository corrections;
     private final ActivityRepository activity;
+    private final SyncJournal journal;
     private final ObjectMapper objectMapper;
 
     public CorrectionService(ExpenseRepository expenses, GroupRepository groups, MemberResolver members,
                              IdempotencyStore idempotency, CorrectionRepository corrections,
-                             ActivityRepository activity, ObjectMapper objectMapper) {
+                             ActivityRepository activity, SyncJournal journal,
+                             ObjectMapper objectMapper) {
         this.expenses = expenses;
         this.groups = groups;
         this.members = members;
         this.idempotency = idempotency;
         this.corrections = corrections;
         this.activity = activity;
+        this.journal = journal;
         this.objectMapper = objectMapper;
     }
 
@@ -104,6 +108,11 @@ public class CorrectionService {
                 expenseId, replacement.revision(), now, details));
 
         ExpenseView view = ExpenseView.from(replacement);
+        journal.append(group.memberships().stream()
+                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .map(com.dutch.ledger.group.Membership::memberId).toList(),
+                "EXPENSE", replacement.id().value(), "upsert", replacement.revision(),
+                objectMapper.convertValue(view, java.util.Map.class), null, now);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;
     }

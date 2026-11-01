@@ -1,4 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -25,6 +26,7 @@ const DEV = process.env.NODE_ENV !== 'production';
 type Failure = { kind: 'offline' | 'contract'; message: string };
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [session, setSession] = useState<SessionState>(BOOTING);
   const [profile, setProfile] = useState<ProfileStateResult>();
   const [online, setOnline] = useState(true);
@@ -241,7 +243,12 @@ export default function HomeScreen() {
         <Unavailable message={failure?.message ?? null} onRetry={retry} onSignOut={signOut} />
       ) : null}
       {screen === 'home' && session.kind === 'authenticated' ? (
-        <Home memberId={session.memberId} ledgerAvailable={session.ledgerAvailable} onSignOut={signOut} />
+        <Home
+          memberId={session.memberId}
+          ledgerAvailable={session.ledgerAvailable}
+          onOpenGroups={() => router.push('/groups')}
+          onSignOut={signOut}
+        />
       ) : null}
     </View>
   );
@@ -376,10 +383,12 @@ function Unavailable({
 function Home({
   memberId,
   ledgerAvailable,
+  onOpenGroups,
   onSignOut
 }: {
   memberId: string;
   ledgerAvailable: boolean;
+  onOpenGroups: () => void;
   onSignOut: () => void;
 }) {
   return (
@@ -398,9 +407,11 @@ function Home({
           {ledgerAvailable ? 'Ledger access active' : 'Ledger access locked'}
         </Text>
       </View>
+      <Pressable accessibilityRole="button" onPress={onOpenGroups} style={styles.primary}>
+        <Text style={styles.primaryLabel}>View groups</Text>
+      </Pressable>
       <Text style={styles.body}>
-        Groups and balances arrive in the next slice. Until then this shell only proves the
-        identity and profile path.
+        Groups are available now. Balances and expenses arrive in the next slice.
       </Text>
     </View>
   );

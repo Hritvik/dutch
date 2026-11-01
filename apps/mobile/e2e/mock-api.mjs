@@ -25,6 +25,24 @@ const server = createServer((request, response) => {
     }
     return;
   }
+  if (request.method === 'GET' && request.url === '/api/v1/groups') {
+    json(response, 200, {
+      data: [
+        {
+          id: 'grp_012345678901234567',
+          name: 'Flat 12',
+          currency: 'INR',
+          state: 'ACTIVE',
+          version: 1,
+          memberships: [
+            { memberId: 'mem_dev_012345678901234567', role: 'ADMIN', state: 'ACTIVE' },
+            { memberId: 'mem_112345678901234567', role: 'MEMBER', state: 'INACTIVE' }
+          ]
+        }
+      ]
+    });
+    return;
+  }
   if (request.method === 'GET' && request.url === '/api/v1/me') {
     if (profileStateReads > REQUIRED_READS) {
       json(response, 200, {

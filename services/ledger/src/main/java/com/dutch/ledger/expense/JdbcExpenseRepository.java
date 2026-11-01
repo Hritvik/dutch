@@ -3,6 +3,7 @@ package com.dutch.ledger.expense;
 import com.dutch.ledger.group.GroupId;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -95,6 +96,44 @@ public class JdbcExpenseRepository implements ExpenseRepository {
     }
 
     @Override
+    public Optional<Expense> findExpense(ExpenseId id) {
+        List<ExpenseRow> rows = jdbc.query("""
+                SELECT e.group_id, r.revision, r.description, r.total_minor_units, r.currency,
+                    r.split_method, r.occurred_at
+                FROM expense e JOIN expense_revision r ON r.expense_id = e.expense_id
+                WHERE e.expense_id = ?
+                ORDER BY r.revision DESC
+                LIMIT 1
+                """, (result, index) -> new ExpenseRow(
+                result.getString("group_id"),
+                result.getLong("revision"),
+                result.getString("description"),
+                result.getLong("total_minor_units"),
+                result.getString("currency"),
+                result.getString("split_method"),
+                result.getTimestamp("occurred_at").toInstant()), id.value());
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
+        ExpenseRow row = rows.get(0);
+        List<PayerContribution> payers = jdbc.query("""
+                SELECT member_id, minor_units FROM payer_contribution
+                WHERE expense_id = ? AND revision = ? ORDER BY member_id
+                """, (result, index) -> new PayerContribution(
+                new com.dutch.ledger.group.MemberId(result.getString("member_id")),
+                result.getLong("minor_units")), id.value(), row.revision());
+        List<ParticipantShare> shares = jdbc.query("""
+                SELECT member_id, minor_units FROM participant_share
+                WHERE expense_id = ? AND revision = ? ORDER BY member_id
+                """, (result, index) -> new ParticipantShare(
+                new com.dutch.ledger.group.MemberId(result.getString("member_id")),
+                result.getLong("minor_units")), id.value(), row.revision());
+        return Optional.of(Expense.createAtRevision(id, new GroupId(row.groupId()), row.description(),
+                row.totalMinorUnits(), row.currency(), SplitMethod.valueOf(row.splitMethod()),
+                payers, shares, row.occurredAt(), row.revision()));
+    }
+
+    @Override
     public List<ObligationEntry> entriesFor(GroupId groupId, String currency) {
         return jdbc.query("""
                 SELECT expense_id, revision, debtor_member_id, creditor_member_id, minor_units,
@@ -125,5 +164,9 @@ public class JdbcExpenseRepository implements ExpenseRepository {
         }, streamId);
         return new BalanceProjection(currency, balances,
                 AllocationAlgorithmVersion.EXPENSE_ALLOCATION_V1);
+    }
+
+    private record ExpenseRow(String groupId, long revision, String description, long totalMinorUnits,
+                              String currency, String splitMethod, java.time.Instant occurredAt) {
     }
 }

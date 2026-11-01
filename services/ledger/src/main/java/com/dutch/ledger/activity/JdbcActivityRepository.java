@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-public class JdbcActivityRepository {
+public class JdbcActivityRepository implements ActivityRepository {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -22,6 +22,7 @@ public class JdbcActivityRepository {
         this.objectMapper = objectMapper;
     }
 
+    @Override
     @Transactional
     public void append(ActivityEntry entry) {
         try {
@@ -38,6 +39,7 @@ public class JdbcActivityRepository {
         }
     }
 
+    @Override
     public List<ActivityEntry> forScope(String scopeId) {
         return jdbc.query("""
                 SELECT activity_id, scope_id, actor_member_id, action, target_id,

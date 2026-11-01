@@ -1,8 +1,13 @@
 package com.dutch.ledger;
 
 import com.dutch.ledger.group.ConcurrentGroupUpdateException;
+import com.dutch.ledger.activity.ActivityEntry;
+import com.dutch.ledger.activity.ActivityRepository;
 import com.dutch.ledger.expense.BalanceProjection;
+import com.dutch.ledger.expense.CorrectionRepository;
 import com.dutch.ledger.expense.Expense;
+import com.dutch.ledger.expense.ExpenseCorrection;
+import com.dutch.ledger.expense.ExpenseId;
 import com.dutch.ledger.expense.ExpenseRepository;
 import com.dutch.ledger.expense.IdempotencyStore;
 import com.dutch.ledger.expense.ObligationEntry;
@@ -71,6 +76,18 @@ public class TestGroupConfiguration {
     }
 
     @Bean
+    @Primary
+    CorrectionRepository correctionRepository(ExpenseRepository expenses) {
+        return new InMemoryCorrectionRepository(expenses);
+    }
+
+    @Bean
+    @Primary
+    ActivityRepository activityRepository() {
+        return new InMemoryActivityRepository();
+    }
+
+    @Bean
     PlatformTransactionManager transactionManager() {
         return new NoOpTransactionManager();
     }
@@ -117,6 +134,39 @@ public class TestGroupConfiguration {
                 group.version(), group.memberships());
     }
 
+    static final class InMemoryCorrectionRepository implements CorrectionRepository {
+        private final java.util.List<ExpenseCorrection> saved = new CopyOnWriteArrayList<>();
+        private final ExpenseRepository expenses;
+
+        InMemoryCorrectionRepository(ExpenseRepository expenses) {
+            this.expenses = expenses;
+        }
+
+        @Override
+        public void save(ExpenseCorrection correction) {
+            saved.add(correction);
+            expenses.save(correction.replacement());
+        }
+
+        int size() {
+            return saved.size();
+        }
+    }
+
+    static final class InMemoryActivityRepository implements ActivityRepository {
+        private final java.util.List<ActivityEntry> entries = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void append(ActivityEntry entry) {
+            entries.add(entry);
+        }
+
+        @Override
+        public java.util.List<ActivityEntry> forScope(String scopeId) {
+            return entries.stream().filter(entry -> entry.scopeId().equals(scopeId)).toList();
+        }
+    }
+
     static final class InMemoryExpenseRepository implements ExpenseRepository {
         private final java.util.List<Expense> saved = new CopyOnWriteArrayList<>();
 
@@ -126,10 +176,24 @@ public class TestGroupConfiguration {
         }
 
         @Override
+        public java.util.Optional<Expense> findExpense(ExpenseId id) {
+            return saved.stream()
+                    .filter(expense -> expense.id().equals(id))
+                    .max(java.util.Comparator.comparingLong(Expense::revision));
+        }
+
+        @Override
         public java.util.List<ObligationEntry> entriesFor(GroupId groupId, String currency) {
+            // Only the latest revision of each expense is live here: the in-memory
+            // adapter has no reversal entries, so the latest revision is its net.
             return saved.stream()
                     .filter(expense -> expense.groupId().equals(groupId)
                             && expense.currency().equals(currency))
+                    .collect(java.util.stream.Collectors.groupingBy(Expense::id,
+                            java.util.stream.Collectors.maxBy(
+                                    java.util.Comparator.comparingLong(Expense::revision))))
+                    .values().stream()
+                    .flatMap(latest -> latest.stream())
                     .flatMap(expense -> expense.obligationEntries().stream())
                     .toList();
         }

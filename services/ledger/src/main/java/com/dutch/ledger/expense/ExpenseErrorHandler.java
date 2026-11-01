@@ -1,7 +1,9 @@
 package com.dutch.ledger.expense;
 
+import com.dutch.ledger.group.ConcurrentGroupUpdateException;
 import com.dutch.ledger.group.GroupAccessDeniedException;
 import com.dutch.ledger.group.GroupForbiddenException;
+import com.dutch.ledger.group.GroupRuleException;
 import com.dutch.ledger.web.CorrelationIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
@@ -13,7 +15,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(assignableTypes = ExpenseController.class)
+@RestControllerAdvice(assignableTypes = {ExpenseController.class, CorrectionController.class, ActivityController.class})
 final class ExpenseErrorHandler {
 
     @ExceptionHandler(GroupAccessDeniedException.class)
@@ -24,6 +26,17 @@ final class ExpenseErrorHandler {
     @ExceptionHandler(GroupForbiddenException.class)
     ResponseEntity<Map<String, Object>> forbidden(HttpServletRequest request) {
         return error(request, HttpStatus.FORBIDDEN, "forbidden", "Access is denied");
+    }
+
+    @ExceptionHandler(ConcurrentGroupUpdateException.class)
+    ResponseEntity<Map<String, Object>> stale(HttpServletRequest request) {
+        return error(request, HttpStatus.CONFLICT, "stale_version", "The group changed. Refresh and retry.");
+    }
+
+    @ExceptionHandler(GroupRuleException.class)
+    ResponseEntity<Map<String, Object>> rule(HttpServletRequest request) {
+        return error(request, HttpStatus.CONFLICT, "conflict",
+                "The request conflicts with the current state.");
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)

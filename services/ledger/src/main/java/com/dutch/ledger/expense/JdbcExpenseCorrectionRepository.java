@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Appends a correction revision, its reversal entries, and the replacement entries. */
 @Repository
-public class JdbcExpenseCorrectionRepository {
+public class JdbcExpenseCorrectionRepository implements CorrectionRepository {
 
     private final JdbcTemplate jdbc;
 
@@ -17,6 +17,7 @@ public class JdbcExpenseCorrectionRepository {
         this.jdbc = jdbc;
     }
 
+    @Override
     @Transactional
     public void save(ExpenseCorrection correction) {
         Expense replacement = correction.replacement();

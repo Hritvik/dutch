@@ -265,6 +265,61 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/groups/{groupId}/expenses/{expenseId}/corrections:
+    post:
+      operationId: correctExpense
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/ExpenseId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseRequest"
+      responses:
+        "200":
+          description: The corrected expense revision and its exact entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/groups/{groupId}/activity:
+    get:
+      operationId: listActivity
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      responses:
+        "200":
+          description: The group's Activity in occurrence order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   securitySchemes:
     bearerAuth:
@@ -284,6 +339,13 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/MemberId"
+    ExpenseId:
+      name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^exp_[A-Za-z0-9_-]{16,128}$
     IfMatch:
       name: If-Match
       in: header
@@ -725,3 +787,61 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ExpenseView"
+    ActivityAction:
+      type: string
+      enum:
+        - EXPENSE_CREATED
+        - EXPENSE_CORRECTED
+        - EXPENSE_DELETED
+        - EXPENSE_RESTORED
+        - SETTLEMENT_RECORDED
+        - SETTLEMENT_VOIDED
+        - MEMBERSHIP_CHANGED
+    ActivityEntryView:
+      type: object
+      additionalProperties: false
+      required:
+        - activityId
+        - scopeId
+        - action
+        - targetId
+        - targetRevision
+        - occurredAt
+        - details
+      properties:
+        activityId:
+          type: string
+          pattern: ^act_[A-Za-z0-9_-]{16,128}$
+        scopeId:
+          type: string
+          minLength: 1
+        actor:
+          $ref: "#/components/schemas/MemberId"
+          description: Absent for a Former member.
+        action:
+          $ref: "#/components/schemas/ActivityAction"
+        targetId:
+          type: string
+          minLength: 1
+        targetRevision:
+          type: integer
+          minimum: 0
+        occurredAt:
+          type: string
+          format: date-time
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          description: A closed whitelist of non-contact details.
+    ActivityListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/ActivityEntryView"

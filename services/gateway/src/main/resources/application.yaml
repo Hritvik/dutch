@@ -1,6 +1,10 @@
 spring:
   application:
     name: dutch-gateway
+gateway:
+  routes:
+    ums-base-url: ${GATEWAY_UMS_BASE_URL:http://localhost:8082}
+    ledger-base-url: ${GATEWAY_LEDGER_BASE_URL:http://localhost:8083}
 management:
   endpoints:
     web:

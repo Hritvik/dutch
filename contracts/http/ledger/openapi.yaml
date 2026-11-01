@@ -574,6 +574,7 @@ components:
           items:
             type: integer
             minimum: 1
+          description: Each value must be between 1 and 10000; all values must sum to exactly 10000.
         occurredAt:
           type: string
           format: date-time

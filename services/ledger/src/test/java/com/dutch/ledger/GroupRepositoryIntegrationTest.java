@@ -11,6 +11,11 @@ import com.dutch.ledger.group.GroupRole;
 import com.dutch.ledger.group.JdbcGroupRepository;
 import com.dutch.ledger.group.MemberId;
 import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -37,6 +42,7 @@ class GroupRepositoryIntegrationTest {
 
     private static GroupRepository repository;
     private static TransactionTemplate transactions;
+    private static JdbcTemplate jdbc;
 
     @BeforeAll
     static void prepare() {
@@ -44,7 +50,7 @@ class GroupRepositoryIntegrationTest {
                 .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
                 .load()
                 .migrate();
-        JdbcTemplate jdbc = new JdbcTemplate(new DriverManagerDataSource(
+        jdbc = new JdbcTemplate(new DriverManagerDataSource(
                 database.getJdbcUrl(), database.getUsername(), database.getPassword()));
         repository = new JdbcGroupRepository(jdbc);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(jdbc.getDataSource()));
@@ -70,6 +76,43 @@ class GroupRepositoryIntegrationTest {
                 .extracting(membership -> membership.state().name()).isEqualTo("INVITED");
         assertThat(repository.findReadableBy(ADMIN)).extracting(Group::id).contains(GROUP);
         assertThat(repository.findReadableBy(OTHER)).isEmpty();
+    }
+
+    @Test
+    void locks_the_group_row_for_a_command() throws Exception {
+        GroupId lockedGroup = new GroupId("grp_812345678901234567");
+        transactions.executeWithoutResult(status ->
+                repository.saveNew(Group.create(lockedGroup, "Lock", "INR", ADMIN, NOW)));
+
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> holder = pool.submit(() -> transactions.executeWithoutResult(status -> {
+                repository.findByIdForUpdate(lockedGroup);
+                locked.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                }
+            }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+
+            Future<?> waiter = pool.submit(() -> assertThatThrownBy(() ->
+                    transactions.executeWithoutResult(status -> {
+                        jdbc.execute("SET LOCAL lock_timeout = '200ms'");
+                        repository.findByIdForUpdate(lockedGroup);
+                    })).hasStackTraceContaining("lock timeout"));
+
+            Thread.sleep(500);
+            waiter.get(5, TimeUnit.SECONDS);
+            release.countDown();
+            holder.get(5, TimeUnit.SECONDS);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
     }
 
     @Test

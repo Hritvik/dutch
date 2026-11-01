@@ -99,9 +99,22 @@ public class ExpenseService {
         if (request.occurredAt() == null) {
             throw new IllegalArgumentException("occurredAt is required");
         }
-        List<PayerContribution> payers = Objects.requireNonNull(request.payers(), "payers").stream()
-                .map(payer -> new PayerContribution(
-                        new MemberId(payer.memberId()), payer.minorUnits()))
+        if (request.description() == null) {
+            throw new IllegalArgumentException("description is required");
+        }
+        if (request.currency() == null) {
+            throw new IllegalArgumentException("currency is required");
+        }
+        if (request.payers() == null) {
+            throw new IllegalArgumentException("payers are required");
+        }
+        List<PayerContribution> payers = request.payers().stream()
+                .map(payer -> {
+                    if (payer == null || payer.memberId() == null) {
+                        throw new IllegalArgumentException("payer memberId is required");
+                    }
+                    return new PayerContribution(new MemberId(payer.memberId()), payer.minorUnits());
+                })
                 .toList();
         List<MemberId> participants = request.participants() == null ? List.of()
                 : request.participants().stream().map(MemberId::new).toList();
@@ -116,8 +129,13 @@ public class ExpenseService {
                 }
                 yield Allocation.exact(request.totalMinorUnits(), request.currency(),
                         request.exactShares().stream()
-                                .map(share -> new ParticipantShare(
-                                        new MemberId(share.memberId()), share.minorUnits()))
+                                .map(share -> {
+                                    if (share == null || share.memberId() == null) {
+                                        throw new IllegalArgumentException("share memberId is required");
+                                    }
+                                    return new ParticipantShare(
+                                            new MemberId(share.memberId()), share.minorUnits());
+                                })
                                 .toList());
             }
             case PERCENTAGE -> {

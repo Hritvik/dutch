@@ -42,6 +42,16 @@ class ExpenseControllerTest {
     private JwtDecoder jwtDecoder;
 
     @Test
+    void rejects_an_unauthenticated_expense_request() throws Exception {
+        mockMvc.perform(post("/api/v1/groups/grp_012345678901234567/expenses")
+                        .header("Idempotency-Key", "expense-unauthenticated")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(expenseJson(100, "INR")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("unauthorized"));
+    }
+
+    @Test
     void creates_an_expense_and_returns_its_exact_entries() throws Exception {
         String groupId = createGroup();
 

@@ -245,6 +245,36 @@ class JdbcExpenseRepositoryIntegrationTest {
     }
 
     @Test
+    void rejects_a_revision_whose_shares_do_not_match_the_total() {
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            jdbc.update("""
+                    INSERT INTO financial_stream (stream_id, scope_type, group_id, currency)
+                    VALUES ('group:bad-shares:INR', 'GROUP', ?, 'INR')
+                    """, GROUP.value());
+            jdbc.update("""
+                    INSERT INTO expense (expense_id, group_id, description, currency, total_minor_units,
+                        split_method, algorithm_version, occurred_at)
+                    VALUES ('exp_812345678901234567', ?, 'Bad shares', 'INR', 100, 'EQUAL', 'v1', now())
+                    """, GROUP.value());
+            jdbc.update("""
+                    INSERT INTO expense_revision (expense_id, revision, description, total_minor_units,
+                        currency, split_method, algorithm_version, occurred_at)
+                    VALUES ('exp_812345678901234567', 1, 'Bad shares', 100, 'INR', 'EQUAL', 'v1', now())
+                    """);
+            jdbc.update("""
+                    INSERT INTO payer_contribution
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_812345678901234567', 1, ?, ?, 100)
+                    """, GROUP.value(), ADMIN.value());
+            jdbc.update("""
+                    INSERT INTO participant_share
+                        (expense_id, revision, group_id, member_id, minor_units)
+                    VALUES ('exp_812345678901234567', 1, ?, ?, 90)
+                    """, GROUP.value(), ADMIN.value());
+        })).hasStackTraceContaining("contributions/shares must equal 100");
+    }
+
+    @Test
     void rejects_a_revision_whose_contributions_do_not_match_the_total_at_commit() {
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
             jdbc.update("""

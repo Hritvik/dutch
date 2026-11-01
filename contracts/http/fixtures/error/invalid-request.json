@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "invalid_request",
+    "message": "Request is invalid",
+    "correlationId": "cor_0123456789012345"
+  }
+}

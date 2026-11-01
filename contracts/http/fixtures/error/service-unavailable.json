@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "service_unavailable",
+    "message": "Service is temporarily unavailable",
+    "correlationId": "cor_0123456789012345"
+  }
+}

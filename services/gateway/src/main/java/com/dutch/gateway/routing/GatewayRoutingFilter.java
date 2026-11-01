@@ -1,7 +1,7 @@
 package com.dutch.gateway.routing;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -12,11 +12,14 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import org.springframework.http.MediaType;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -27,23 +30,23 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public final class GatewayRoutingFilter extends OncePerRequestFilter {
 
-    public static final String CORRELATION_HEADER = "X-Correlation-Id";
-
+    private static final Set<String> BODY_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
     private static final Set<String> HOP_BY_HOP = Set.of(
             "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
             "te", "trailer", "transfer-encoding", "upgrade", "host", "content-length", "expect");
+    private static final Set<String> DROPPED = Set.of(
+            "forwarded", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto",
+            "x-forwarded-port", "x-original-url", "x-rewrite-url");
 
     private final GatewayRouteProperties routes;
+    private final ObjectMapper objectMapper;
     private final HttpClient client;
 
     @Autowired
-    public GatewayRoutingFilter(GatewayRouteProperties routes) {
-        this(routes, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build());
-    }
-
-    GatewayRoutingFilter(GatewayRouteProperties routes, HttpClient client) {
+    public GatewayRoutingFilter(GatewayRouteProperties routes, ObjectMapper objectMapper) {
         this.routes = routes;
-        this.client = client;
+        this.objectMapper = objectMapper;
+        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     }
 
     @Override
@@ -56,15 +59,20 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
-        String correlationId = correlationId(request.getHeader(CORRELATION_HEADER));
-        response.setHeader(CORRELATION_HEADER, correlationId);
+            throws IOException {
+        String correlationId = CorrelationId.resolve(request.getHeader(CorrelationId.HEADER));
+        response.setHeader(CorrelationId.HEADER, correlationId);
+
+        if (request.getRequestURI().contains("..")) {
+            writeError(response, 400, "invalid_request", "Request is invalid", correlationId);
+            return;
+        }
 
         HttpRequest upstream;
         try {
             upstream = requestBuilder(request, target(request), correlationId).build();
         } catch (IllegalArgumentException exception) {
-            writeError(response, 400, "invalid_request_target", correlationId);
+            writeError(response, 400, "invalid_request", "Request is invalid", correlationId);
             return;
         }
 
@@ -76,15 +84,15 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
                     values.forEach(value -> response.addHeader(name, value));
                 }
             });
-            response.setHeader(CORRELATION_HEADER, correlationId);
+            response.setHeader(CorrelationId.HEADER, correlationId);
             try (InputStream body = answer.body()) {
                 body.transferTo(response.getOutputStream());
             }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            writeError(response, 502, "upstream_unavailable", correlationId);
+            writeError(response, 503, "service_unavailable", "Service is temporarily unavailable", correlationId);
         } catch (IOException exception) {
-            writeError(response, 502, "upstream_unavailable", correlationId);
+            writeError(response, 503, "service_unavailable", "Service is temporarily unavailable", correlationId);
         }
     }
 
@@ -97,23 +105,26 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
         return URI.create(base + path + (query == null ? "" : "?" + query));
     }
 
-    private HttpRequest.Builder requestBuilder(HttpServletRequest request, URI target, String correlationId)
-            throws IOException {
+    private HttpRequest.Builder requestBuilder(HttpServletRequest request, URI target, String correlationId) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(target)
                 .timeout(Duration.ofSeconds(15))
                 .method(request.getMethod(), bodyPublisher(request));
+        Set<String> connectionTokens = connectionTokens(request.getHeader("Connection"));
         request.getHeaderNames().asIterator().forEachRemaining(name -> {
-            if (!HOP_BY_HOP.contains(name.toLowerCase(Locale.ROOT))
-                    && !CORRELATION_HEADER.equalsIgnoreCase(name)) {
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (!HOP_BY_HOP.contains(lower)
+                    && !DROPPED.contains(lower)
+                    && !connectionTokens.contains(lower)
+                    && !CorrelationId.HEADER.equalsIgnoreCase(name)) {
                 request.getHeaders(name).asIterator().forEachRemaining(value -> builder.header(name, value));
             }
         });
-        builder.header(CORRELATION_HEADER, correlationId);
+        builder.header(CorrelationId.HEADER, correlationId);
         return builder;
     }
 
     private HttpRequest.BodyPublisher bodyPublisher(HttpServletRequest request) {
-        if (request.getContentLengthLong() <= 0) {
+        if (!BODY_METHODS.contains(request.getMethod().toUpperCase(Locale.ROOT))) {
             return HttpRequest.BodyPublishers.noBody();
         }
         return HttpRequest.BodyPublishers.ofInputStream(() -> {
@@ -125,21 +136,28 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
         });
     }
 
-    private static String correlationId(String supplied) {
-        if (supplied != null && !supplied.isBlank() && supplied.length() <= 128
-                && supplied.chars().noneMatch(Character::isISOControl)) {
-            return supplied;
+    private static Set<String> connectionTokens(String header) {
+        if (header == null || header.isBlank()) {
+            return Set.of();
         }
-        return UUID.randomUUID().toString();
+        return Arrays.stream(header.split(","))
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .filter(value -> !value.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
-    private static void writeError(HttpServletResponse response, int status, String code, String correlationId)
-            throws IOException {
+    private void writeError(HttpServletResponse response, int status, String code, String message,
+                            String correlationId) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setHeader(CORRELATION_HEADER, correlationId);
-        response.getWriter().write("{\"error\":{\"code\":\"" + code
-                + "\",\"message\":\"The requested service is unavailable.\",\"correlationId\":\""
-                + correlationId + "\"}}");
+        response.setHeader(CorrelationId.HEADER, correlationId);
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("code", code);
+        error.put("message", message);
+        error.put("correlationId", correlationId);
+        objectMapper.writeValue(response.getOutputStream(), Map.of("error", error));
     }
 }

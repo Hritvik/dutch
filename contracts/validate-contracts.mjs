@@ -132,6 +132,10 @@ export async function validateEventFixture(contractsRoot, eventType, fixture) {
 const httpFixtures = [
   ['health-ready', 'HealthResponse', 'http/fixtures/success/health-ready.json'],
   ['profile-required', 'ErrorResponse', 'http/fixtures/error/profile-required.json'],
+  ['unauthorized', 'ErrorResponse', 'http/fixtures/error/unauthorized.json'],
+  ['forbidden', 'ErrorResponse', 'http/fixtures/error/forbidden.json'],
+  ['invalid-request', 'ErrorResponse', 'http/fixtures/error/invalid-request.json'],
+  ['service-unavailable', 'ErrorResponse', 'http/fixtures/error/service-unavailable.json'],
   ['profile-state-required', 'ProfileStateResponse', 'http/fixtures/success/profile-state-required.json'],
   ['profile-state-ready', 'ProfileStateResponse', 'http/fixtures/success/profile-state-ready.json'],
   ['profile-ready', 'ProfileReadyResponse', 'http/fixtures/success/profile-ready.json']

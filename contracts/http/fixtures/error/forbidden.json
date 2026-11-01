@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "forbidden",
+    "message": "Access is denied",
+    "correlationId": "cor_0123456789012345"
+  }
+}

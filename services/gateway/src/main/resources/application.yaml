@@ -1,6 +1,11 @@
 spring:
   application:
     name: dutch-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${GATEWAY_IAM_ISSUER_URI:}
 gateway:
   routes:
     ums-base-url: ${GATEWAY_UMS_BASE_URL:http://localhost:8082}

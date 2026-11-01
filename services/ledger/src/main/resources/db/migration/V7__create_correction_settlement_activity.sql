@@ -1,8 +1,14 @@
 -- Correction, settlement, and Activity evidence.
 ALTER TABLE obligation_entry
     ADD COLUMN entry_kind TEXT NOT NULL DEFAULT 'CHARGE'
-        CHECK (entry_kind IN ('CHARGE', 'REVERSAL')),
-    ADD COLUMN correction_id TEXT;
+        CHECK (entry_kind IN ('CHARGE', 'REVERSAL', 'SETTLEMENT', 'SETTLEMENT_VOID')),
+    ADD COLUMN correction_id TEXT,
+    ADD COLUMN settlement_id TEXT,
+    ALTER COLUMN expense_id DROP NOT NULL,
+    ALTER COLUMN revision DROP NOT NULL,
+    ALTER COLUMN group_id DROP NOT NULL,
+    ADD CONSTRAINT obligation_entry_single_source
+        CHECK ((expense_id IS NOT NULL) <> (settlement_id IS NOT NULL));
 
 ALTER TABLE obligation_entry
     DROP CONSTRAINT IF EXISTS obligation_entry_expense_id_revision_debtor_member_id_credi_key;
@@ -14,6 +20,10 @@ CREATE UNIQUE INDEX obligation_entry_charge_pair
 CREATE UNIQUE INDEX obligation_entry_reversal_pair
     ON obligation_entry (correction_id, debtor_member_id, creditor_member_id)
     WHERE entry_kind = 'REVERSAL';
+
+CREATE UNIQUE INDEX obligation_entry_settlement_pair
+    ON obligation_entry (settlement_id, stream_id, debtor_member_id, creditor_member_id)
+    WHERE settlement_id IS NOT NULL;
 
 -- Reversal entries are evidence of a prior revision and are not part of the new
 -- revision's contribution/share net; only CHARGE entries participate in the check.
@@ -120,6 +130,10 @@ CREATE TABLE settlement_void (
     occurred_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE obligation_entry
+    ADD CONSTRAINT obligation_entry_settlement_fk
+        FOREIGN KEY (settlement_id) REFERENCES settlement (settlement_id);
 
 CREATE TABLE activity_entry (
     activity_id TEXT PRIMARY KEY CHECK (activity_id ~ '^act_[A-Za-z0-9_-]{16,128}$'),

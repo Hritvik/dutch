@@ -3,7 +3,12 @@ package com.dutch.ledger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.dutch.ledger.expense.JdbcExpenseRepository;
+import com.dutch.ledger.group.Group;
+import com.dutch.ledger.group.GroupId;
+import com.dutch.ledger.group.GroupRole;
 import com.dutch.ledger.group.GroupRuleException;
+import com.dutch.ledger.group.JdbcGroupRepository;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.settlement.JdbcSettlementRepository;
 import com.dutch.ledger.settlement.Settlement;
@@ -30,6 +35,7 @@ class JdbcSettlementRepositoryIntegrationTest {
     private static final SettlementId SETTLEMENT = new SettlementId("stl_012345678901234567");
     private static final MemberId A = new MemberId("mem_012345678901234567");
     private static final MemberId B = new MemberId("mem_112345678901234567");
+    private static final GroupId GROUP = new GroupId("grp_012345678901234567");
     private static final Instant NOW = Instant.parse("2026-11-01T00:00:00Z");
 
     @Container
@@ -50,6 +56,13 @@ class JdbcSettlementRepositoryIntegrationTest {
                 database.getJdbcUrl(), database.getUsername(), database.getPassword()));
         settlements = new JdbcSettlementRepository(jdbc);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(jdbc.getDataSource()));
+        JdbcGroupRepository groups = new JdbcGroupRepository(jdbc);
+        transactions.executeWithoutResult(status -> {
+            Group group = Group.create(GROUP, "Flat", "INR", A, NOW);
+            group.invite(A, B, GroupRole.MEMBER, NOW);
+            group.activate(B, B, NOW);
+            groups.saveNew(group);
+        });
     }
 
     @Test
@@ -64,6 +77,17 @@ class JdbcSettlementRepositoryIntegrationTest {
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM settlement_allocation WHERE settlement_id = ?",
                 Long.class, SETTLEMENT.value())).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM obligation_entry WHERE settlement_id = ? AND entry_kind = 'SETTLEMENT'",
+                Long.class, SETTLEMENT.value())).isEqualTo(2);
+        assertThat(new JdbcExpenseRepository(jdbc).projectionFor(GROUP, "INR").balances())
+                .containsEntry(A, 60L)
+                .containsEntry(B, -60L);
+        assertThat(jdbc.queryForObject("""
+                SELECT balance_minor_units FROM member_balance_projection
+                WHERE stream_id = 'direct:mem_000000000000000001:mem_000000000000000002:INR'
+                  AND member_id = ?
+                """, Long.class, A.value())).isEqualTo(40L);
 
         SettlementVoid voided = SettlementHistory.of(settlement).voidIt(A, NOW);
         transactions.executeWithoutResult(status -> settlements.voidSettlement(voided));
@@ -71,6 +95,14 @@ class JdbcSettlementRepositoryIntegrationTest {
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM settlement_void WHERE settlement_id = ?",
                 Long.class, SETTLEMENT.value())).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM obligation_entry WHERE settlement_id = ? AND entry_kind = 'SETTLEMENT_VOID'",
+                Long.class, SETTLEMENT.value())).isEqualTo(2);
+        assertThat(new JdbcExpenseRepository(jdbc).projectionFor(GROUP, "INR").balances()).isEmpty();
+        assertThat(jdbc.queryForObject("""
+                SELECT COALESCE(SUM(balance_minor_units), 0) FROM member_balance_projection
+                WHERE stream_id = 'direct:mem_000000000000000001:mem_000000000000000002:INR'
+                """, Long.class)).isZero();
 
         assertThatThrownBy(() -> transactions.executeWithoutResult(status ->
                 settlements.voidSettlement(SettlementVoid.of(settlement, A, NOW))))

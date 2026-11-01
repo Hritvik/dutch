@@ -11,6 +11,10 @@ import com.dutch.ledger.expense.ExpenseId;
 import com.dutch.ledger.expense.ExpenseRepository;
 import com.dutch.ledger.expense.IdempotencyStore;
 import com.dutch.ledger.expense.ObligationEntry;
+import com.dutch.ledger.settlement.Settlement;
+import com.dutch.ledger.settlement.SettlementId;
+import com.dutch.ledger.settlement.SettlementRepository;
+import com.dutch.ledger.settlement.SettlementVoid;
 import com.dutch.ledger.group.Group;
 import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
@@ -85,6 +89,12 @@ public class TestGroupConfiguration {
     @Primary
     ActivityRepository activityRepository() {
         return new InMemoryActivityRepository();
+    }
+
+    @Bean
+    @Primary
+    SettlementRepository settlementRepository() {
+        return new InMemorySettlementRepository();
     }
 
     @Bean
@@ -164,6 +174,36 @@ public class TestGroupConfiguration {
         @Override
         public java.util.List<ActivityEntry> forScope(String scopeId) {
             return entries.stream().filter(entry -> entry.scopeId().equals(scopeId)).toList();
+        }
+    }
+
+    static final class InMemorySettlementRepository implements SettlementRepository {
+        private final Map<SettlementId, Settlement> saved = new ConcurrentHashMap<>();
+        private final Map<SettlementId, String> statuses = new ConcurrentHashMap<>();
+
+        @Override
+        public void save(Settlement settlement) {
+            saved.put(settlement.id(), settlement);
+            statuses.put(settlement.id(), "ACTIVE");
+        }
+
+        @Override
+        public void voidSettlement(SettlementVoid voidAction) {
+            if (!"ACTIVE".equals(statuses.get(voidAction.settlementId()))) {
+                throw new com.dutch.ledger.group.GroupRuleException(
+                        "This settlement has already been voided.");
+            }
+            statuses.put(voidAction.settlementId(), "VOIDED");
+        }
+
+        @Override
+        public Optional<Settlement> find(SettlementId id) {
+            return Optional.ofNullable(saved.get(id));
+        }
+
+        @Override
+        public String status(SettlementId id) {
+            return statuses.get(id);
         }
     }
 

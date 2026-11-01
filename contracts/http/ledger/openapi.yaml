@@ -300,6 +300,67 @@ paths:
           $ref: "#/components/responses/Conflict"
         "503":
           $ref: "#/components/responses/Unavailable"
+  /api/v1/groups/{groupId}/settlements:
+    post:
+      operationId: recordSettlement
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSettlementRequest"
+      responses:
+        "200":
+          description: The recorded settlement and its scope allocations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
+  /api/v1/groups/{groupId}/settlements/{settlementId}/void:
+    post:
+      operationId: voidSettlement
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+        - $ref: "#/components/parameters/SettlementId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The voided settlement; the second void is a 409.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/Unavailable"
   /api/v1/groups/{groupId}/activity:
     get:
       operationId: listActivity
@@ -346,6 +407,13 @@ components:
       schema:
         type: string
         pattern: ^exp_[A-Za-z0-9_-]{16,128}$
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^stl_[A-Za-z0-9_-]{16,128}$
     IfMatch:
       name: If-Match
       in: header
@@ -787,6 +855,125 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/ExpenseView"
+    SettlementScopeId:
+      type: string
+      minLength: 1
+      maxLength: 256
+    SettlementAllocationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - scopeId
+        - minorUnits
+      properties:
+        scopeId:
+          $ref: "#/components/schemas/SettlementScopeId"
+        minorUnits:
+          type: integer
+          minimum: 1
+    CreateSettlementRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - payerMemberId
+        - payeeMemberId
+        - totalMinorUnits
+        - currency
+        - occurredAt
+      properties:
+        payerMemberId:
+          $ref: "#/components/schemas/MemberId"
+        payeeMemberId:
+          $ref: "#/components/schemas/MemberId"
+        totalMinorUnits:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        occurredAt:
+          type: string
+          format: date-time
+        allocations:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/SettlementAllocationRequest"
+          description: Defaults to this Group's single scope for the whole total.
+    SettlementAllocationView:
+      type: object
+      additionalProperties: false
+      required:
+        - scopeId
+        - currency
+        - minorUnits
+        - payer
+        - payee
+      properties:
+        scopeId:
+          $ref: "#/components/schemas/SettlementScopeId"
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        minorUnits:
+          type: integer
+          minimum: 1
+        payer:
+          $ref: "#/components/schemas/MemberId"
+        payee:
+          $ref: "#/components/schemas/MemberId"
+    SettlementView:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - groupId
+        - payer
+        - payee
+        - totalMinorUnits
+        - currency
+        - status
+        - allocations
+        - occurredAt
+      properties:
+        id:
+          type: string
+          pattern: ^stl_[A-Za-z0-9_-]{16,128}$
+        groupId:
+          $ref: "#/components/schemas/GroupId"
+        payer:
+          $ref: "#/components/schemas/MemberId"
+        payee:
+          $ref: "#/components/schemas/MemberId"
+        totalMinorUnits:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        status:
+          type: string
+          enum:
+            - ACTIVE
+            - VOIDED
+        allocations:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/SettlementAllocationView"
+        occurredAt:
+          type: string
+          format: date-time
+    SettlementResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/SettlementView"
     ActivityAction:
       type: string
       enum:

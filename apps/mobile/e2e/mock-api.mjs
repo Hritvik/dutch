@@ -36,6 +36,8 @@ let staleInjected = new Set();
 let directExpensesByKey = new Map();
 let directExpensesById = new Map();
 let directActivity = [];
+let seriesById = new Map();
+let occurrencesBySeries = new Map();
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -127,6 +129,7 @@ function buildExpense(group, payload, expenseId, revision) {
 }
 
 function recordActivity(group, action, targetId, targetRevision, details) {
+  if (!group) return;
   activity.push({
     activityId: `act_${randomUUID().replaceAll('-', '')}`,
     scopeId: `group:${group.id}:${group.currency}`,
@@ -152,6 +155,8 @@ const server = createServer(async (request, response) => {
     directExpensesByKey = new Map();
     directExpensesById = new Map();
     directActivity = [];
+    seriesById = new Map();
+    occurrencesBySeries = new Map();
     response.writeHead(204).end();
     return;
   }
@@ -184,6 +189,160 @@ const server = createServer(async (request, response) => {
   }
   const url = new URL(request.url, 'http://localhost');
   const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'series') {
+    if (request.method === 'POST' && parts.length === 3) {
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      const id = `ser_${randomUUID().replaceAll('-', '')}`;
+      const series = {
+        id,
+        scope: payload.scope,
+        description: payload.description,
+        totalMinorUnits: Number(payload.totalMinorUnits),
+        currency: payload.currency,
+        splitMethod: payload.splitMethod,
+        payers: payload.payers,
+        participants: payload.participants,
+        cadence: payload.cadence,
+        dueDay: Number(payload.dueDay),
+        timezone: payload.timezone,
+        status: 'ACTIVE',
+        nextPeriodStart: payload.nextPeriodStart,
+        version: 1
+      };
+      seriesById.set(id, series);
+      occurrencesBySeries.set(id, []);
+      json(response, 200, { data: series });
+      return;
+    }
+    if (request.method === 'GET' && parts.length === 3) {
+      json(response, 200, { data: [...seriesById.values()] });
+      return;
+    }
+    if (parts[3] === 'occurrences' && parts[4] && parts[5]) {
+      const occurrenceId = parts[4];
+      let owner;
+      let occurrence;
+      for (const [seriesId, list] of occurrencesBySeries.entries()) {
+        const found = list.find((entry) => entry.id === occurrenceId);
+        if (found) {
+          owner = seriesById.get(seriesId);
+          occurrence = found;
+          break;
+        }
+      }
+      if (!owner || !occurrence) {
+        json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+        return;
+      }
+      if (request.method === 'POST' && parts[5] === 'skip') {
+        if (occurrence.status !== 'PENDING') {
+          json(response, 409, { error: { code: 'conflict', message: 'No longer pending.' } });
+          return;
+        }
+        occurrence.status = 'SKIPPED';
+        json(response, 200, { data: occurrence });
+        return;
+      }
+      if (request.method === 'POST' && parts[5] === 'submit') {
+        if (occurrence.status !== 'PENDING') {
+          json(response, 409, { error: { code: 'conflict', message: 'No longer pending.' } });
+          return;
+        }
+        const expenseId = `exp_${randomUUID().replaceAll('-', '')}`;
+        const participants = owner.participants.map((participant) => participant.memberId);
+        const expense = buildExpense({ id: owner.scope.groupId }, {
+          description: owner.description,
+          totalMinorUnits: owner.totalMinorUnits,
+          currency: owner.currency,
+          splitMethod: owner.splitMethod,
+          payers: owner.payers,
+          participants,
+          occurredAt: occurrence.dueAt
+        }, expenseId, 1);
+        expensesById.set(expenseId, expense);
+        occurrence.status = 'SUBMITTED';
+        occurrence.expenseId = expenseId;
+        recordActivity(groups.find((group) => group.id === owner.scope.groupId),
+          'EXPENSE_CREATED', expenseId, 1, {
+            description: owner.description,
+            totalMinorUnits: String(owner.totalMinorUnits),
+            currency: owner.currency
+          });
+        json(response, 200, { data: { occurrence, expenseId } });
+        return;
+      }
+    }
+    const series = seriesById.get(parts[3]);
+    if (!series) {
+      json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+      return;
+    }
+    if (request.method === 'GET' && parts.length === 4) {
+      json(response, 200, { data: series });
+      return;
+    }
+    if (request.method === 'GET' && parts[4] === 'occurrences' && parts.length === 5) {
+      json(response, 200, { data: occurrencesBySeries.get(series.id) ?? [] });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'occurrences' && parts.length === 5) {
+      const expected = String(request.headers['if-match'] ?? '').replaceAll('"', '');
+      if (Number(expected) !== series.version) {
+        json(response, 409, {
+          error: { code: 'stale_version', message: 'The group changed. Refresh and retry.' }
+        });
+        return;
+      }
+      const start = new Date(`${series.nextPeriodStart}T00:00:00Z`);
+      const end = series.cadence === 'MONTHLY'
+        ? new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0))
+        : new Date(start.getTime() + 6 * 86400000);
+      const due = series.cadence === 'MONTHLY'
+        ? new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(),
+            Math.min(series.dueDay, new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate())))
+        : new Date(start.getTime() + (series.dueDay - 1) * 86400000);
+      const occurrence = {
+        id: `occ_${randomUUID().replaceAll('-', '')}`,
+        seriesId: series.id,
+        templateVersion: series.version,
+        periodStart: series.nextPeriodStart,
+        periodEnd: end.toISOString().slice(0, 10),
+        dueAt: due.toISOString().replace('.000Z', 'Z'),
+        status: 'PENDING',
+        expenseId: null
+      };
+      const next = series.cadence === 'MONTHLY'
+        ? new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1))
+        : new Date(start.getTime() + 7 * 86400000);
+      series.nextPeriodStart = next.toISOString().slice(0, 10);
+      series.version += 1;
+      occurrencesBySeries.get(series.id).push(occurrence);
+      json(response, 200, { data: occurrence });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'status' && parts.length === 5) {
+      const expected = String(request.headers['if-match'] ?? '').replaceAll('"', '');
+      if (Number(expected) !== series.version) {
+        json(response, 409, {
+          error: { code: 'stale_version', message: 'The series changed.' }
+        });
+        return;
+      }
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      series.status = payload.action === 'PAUSE' ? 'PAUSED'
+        : payload.action === 'RESUME' ? 'ACTIVE' : 'ARCHIVED';
+      series.version += 1;
+      json(response, 200, { data: series });
+      return;
+    }
+  }
+  if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'groups' && parts[4] === 'series') {
+    const group = groups.find((entry) => entry.id === parts[3]);
+    json(response, 200, {
+      data: [...seriesById.values()].filter((entry) => entry.scope.groupId === group?.id)
+    });
+    return;
+  }
   if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'direct-expenses') {
     if (request.method === 'POST' && parts.length === 3) {
       const idempotencyKey = request.headers['idempotency-key'];

@@ -166,10 +166,6 @@ function apiUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, '')}${path}`;
 }
 
-function isRecordPayload(value: unknown): value is Record<string, unknown> {
-  return isRecord(value) && isRecord(value.data);
-}
-
 async function toError(response: Response): Promise<SeriesHttpError> {
   let code = 'error';
   try {
@@ -207,7 +203,7 @@ async function request<T>(
     throw await toError(response);
   }
   const payload = await response.json();
-  if (!isRecordPayload(payload)) {
+  if (!isRecord(payload) || !('data' in payload)) {
     throw new SeriesContractError('Series response is missing data.');
   }
   return parse(payload.data);

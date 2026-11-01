@@ -1,0 +1,46 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- tapOn: "Flat 12"
+- scrollUntilVisible:
+    element: "New recurring series"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "New recurring series"
+- assertVisible: "Recurring series"
+- tapOn:
+    id: "series-description"
+- inputText: "Rent"
+- tapOn:
+    id: "series-amount"
+- inputText: "100"
+- hideKeyboard
+- tapOn: "Create series"
+- extendedWaitUntil:
+    visible: "Generate next occurrence"
+    timeout: 10000
+- assertVisible: "Rent"
+- assertVisible: ".*MONTHLY.*ACTIVE.*version 1.*"
+- tapOn: "Generate next occurrence"
+- extendedWaitUntil:
+    visible: ".*is pending review.*"
+    timeout: 10000
+- assertVisible: "Submit"
+- tapOn: "Submit"
+- extendedWaitUntil:
+    visible: ".*Recorded exp_.*"
+    timeout: 10000
+- takeScreenshot: android-series-submitted
+- tapOn: "Back"
+- scrollUntilVisible:
+    element: "Rent"
+    direction: DOWN
+    timeout: 10000
+- takeScreenshot: android-series-group

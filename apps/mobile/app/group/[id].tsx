@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -27,6 +27,7 @@ import {
 import { fetchMemberProfile } from '../../src/profile-client';
 import { ActivityHttpError, fetchActivity, type ActivityEntry } from '../../src/activity-client';
 import { formatMinor } from '../../src/expenses-client';
+import { listGroupSeries, type SeriesView } from '../../src/series-client';
 
 const config = createAppConfig(process.env);
 
@@ -37,6 +38,7 @@ export default function GroupDetailScreen() {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [activityError, setActivityError] = useState<string | null>(null);
+  const [series, setSeries] = useState<SeriesView[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [inviteId, setInviteId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,6 +61,11 @@ export default function GroupDetailScreen() {
       } catch {
         setMemberId(null);
       }
+      try {
+        setSeries(await listGroupSeries(config.apiBaseUrl, material.accessToken, id));
+      } catch {
+        setSeries([]);
+      }
       setActivityError(null);
       try {
         setActivity(await fetchActivity(config.apiBaseUrl, material.accessToken, id));
@@ -75,10 +82,9 @@ export default function GroupDetailScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  useFocusEffect(useCallback(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh]));
 
   const run = useCallback(async (action: () => Promise<GroupView>) => {
     setBusy(true);
@@ -156,9 +162,35 @@ export default function GroupDetailScreen() {
           >
             <Text style={styles.secondaryLabel}>Record settlement</Text>
           </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/series/new?groupId=${group.id}`)}
+            style={styles.secondary}
+          >
+            <Text style={styles.secondaryLabel}>New recurring series</Text>
+          </Pressable>
         </View>
       ) : null}
 
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Recurring series</Text>
+        {series.length === 0 ? (
+          <Text style={styles.muted}>No recurring series yet.</Text>
+        ) : series.map((entry) => (
+          <Pressable
+            key={entry.id}
+            accessibilityRole="button"
+            onPress={() => router.push(`/series/${entry.id}`)}
+            style={styles.seriesRow}
+          >
+            <Text style={styles.activityAction}>{entry.description}</Text>
+            <Text style={styles.muted}>
+              {formatMinor(entry.totalMinorUnits, entry.currency)} · {entry.cadence} ·{' '}
+              {entry.status} · next {entry.nextPeriodStart}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Activity</Text>
         {activityError ? (
@@ -383,6 +415,7 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: { color: ACCENT, fontSize: 15, fontWeight: '600' },
   activityRow: { borderBottomColor: LINE, borderBottomWidth: 1, paddingVertical: 10 },
+  seriesRow: { borderBottomColor: LINE, borderBottomWidth: 1, paddingVertical: 12 },
   activityAction: { color: INK, fontSize: 14, fontWeight: '600' },
   quiet: { alignItems: 'center', marginTop: 24, paddingVertical: 10 },
   quietLabel: { color: MUTED, fontSize: 13, fontWeight: '600' }

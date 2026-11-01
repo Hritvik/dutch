@@ -183,7 +183,14 @@ public final class Group {
         if (event.aggregateVersion() <= version) {
             return false;
         }
+        if (state == GroupState.ARCHIVED) {
+            throw new GroupRuleException("The group is archived.");
+        }
         Membership existing = memberships.get(event.memberId());
+        if (existing != null && existing.state() == MembershipState.INACTIVE
+                && event.state() == MembershipState.ACTIVE) {
+            throw new GroupRuleException("Reactivation requires a new invitation and acceptance.");
+        }
         Membership updated = new Membership(
                 event.memberId(),
                 event.state(),

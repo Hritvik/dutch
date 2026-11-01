@@ -243,7 +243,7 @@ components:
       name: If-Match
       in: header
       required: true
-      description: Expected aggregate version; a mismatch returns 409 conflict.
+      description: Expected aggregate version; a mismatch returns 409 stale_version.
       schema:
         type: string
         pattern: ^"?[0-9]+"?$
@@ -435,6 +435,8 @@ components:
                 - forbidden
                 - not_found
                 - conflict
+                - stale_version
+                - last_admin
                 - service_unavailable
             message:
               type: string
@@ -444,6 +446,8 @@ components:
                 - Access is denied
                 - Resource was not found
                 - The request conflicts with the current group state
+                - The group changed. Refresh and retry.
+                - A group must retain at least one active Admin.
                 - Service is temporarily unavailable
             correlationId:
               type: string

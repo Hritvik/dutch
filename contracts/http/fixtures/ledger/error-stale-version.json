@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "stale_version",
+    "message": "The group changed. Refresh and retry.",
+    "correlationId": "cor_0123456789012345"
+  }
+}

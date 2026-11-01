@@ -2,8 +2,6 @@ package com.dutch.ledger.mapping;
 
 import java.sql.Timestamp;
 import java.util.List;
-import javax.sql.DataSource;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -11,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Idempotent, monotonic consumer for the UMS member-mapping fact. */
 @Service
-@ConditionalOnBean(DataSource.class)
 public class JdbcMemberMappingConsumer {
 
     private final JdbcTemplate jdbc;

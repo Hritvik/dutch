@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "last_admin",
+    "message": "A group must retain at least one active Admin.",
+    "correlationId": "cor_0123456789012345"
+  }
+}

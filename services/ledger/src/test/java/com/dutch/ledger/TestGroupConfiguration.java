@@ -10,8 +10,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @TestConfiguration
 public class TestGroupConfiguration {
@@ -29,13 +32,20 @@ public class TestGroupConfiguration {
             OUTSIDER_SUBJECT, OUTSIDER);
 
     @Bean
+    @Primary
     GroupRepository groupRepository() {
         return new InMemoryGroupRepository();
     }
 
     @Bean
+    @Primary
     MemberResolver memberResolver() {
         return subject -> Optional.ofNullable(MEMBERS.get(subject));
+    }
+
+    @Bean
+    JdbcTemplate jdbcTemplate() {
+        return Mockito.mock(JdbcTemplate.class);
     }
 
     public static final class InMemoryGroupRepository implements GroupRepository {

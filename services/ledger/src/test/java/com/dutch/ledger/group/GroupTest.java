@@ -97,6 +97,32 @@ class GroupTest {
     }
 
     @Test
+    void a_replay_cannot_reactivate_a_removed_member() {
+        Group group = group();
+        group.invite(ADMIN, MEMBER, GroupRole.MEMBER, NOW);
+        group.activate(MEMBER, MEMBER, NOW);
+        group.remove(ADMIN, MEMBER, NOW);
+
+        assertThatThrownBy(() -> group.applyMembershipEvent(new MembershipEvent(
+                "evt_reactivate", 4, MEMBER, MembershipState.ACTIVE, GroupRole.MEMBER, NOW)))
+                .isInstanceOf(GroupRuleException.class)
+                .hasMessageContaining("new invitation");
+        assertThat(group.membership(MEMBER)).get()
+                .extracting(Membership::state).isEqualTo(MembershipState.INACTIVE);
+    }
+
+    @Test
+    void a_replay_cannot_change_an_archived_group() {
+        Group group = group();
+        group.archive(ADMIN, NOW);
+
+        assertThatThrownBy(() -> group.applyMembershipEvent(new MembershipEvent(
+                "evt_archived", 2, MEMBER, MembershipState.INVITED, GroupRole.MEMBER, NOW)))
+                .isInstanceOf(GroupRuleException.class)
+                .hasMessageContaining("archived");
+    }
+
+    @Test
     void the_last_active_admin_cannot_be_demoted() {
         Group group = group();
 

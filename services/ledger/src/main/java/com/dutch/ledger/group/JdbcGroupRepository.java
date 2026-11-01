@@ -3,14 +3,11 @@ package com.dutch.ledger.group;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Optional;
-import javax.sql.DataSource;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-@ConditionalOnBean(DataSource.class)
 public class JdbcGroupRepository implements GroupRepository {
 
     private final JdbcTemplate jdbc;

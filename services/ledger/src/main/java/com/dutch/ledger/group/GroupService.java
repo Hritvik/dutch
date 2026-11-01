@@ -57,8 +57,11 @@ public class GroupService {
         MemberId actor = requireMember(appSubject);
         MemberId target = new MemberId(memberId);
         Group group = actor.equals(target) ? requireGroup(groupId) : requireReadable(actor, groupId);
+        Membership actorMembership = group.membership(actor).orElseThrow(GroupAccessDeniedException::new);
         if (!actor.equals(target)) {
             requireAdmin(actor, group);
+        } else if (actorMembership.state() == MembershipState.PLACEHOLDER) {
+            throw new GroupForbiddenException();
         }
         requireVersion(group, expectedVersion);
         long expected = group.version();

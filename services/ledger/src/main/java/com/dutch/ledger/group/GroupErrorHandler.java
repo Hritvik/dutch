@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(assignableTypes = GroupController.class)
@@ -41,7 +42,8 @@ final class GroupErrorHandler {
                 "The request conflicts with the current group state");
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class})
+    @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class,
+            MissingRequestHeaderException.class})
     ResponseEntity<Map<String, Object>> invalid(HttpServletRequest request) {
         return error(request, HttpStatus.BAD_REQUEST, "invalid_request", "Request is invalid");
     }

@@ -4,6 +4,7 @@ import static com.dutch.ledger.TestGroupConfiguration.ADMIN;
 import static com.dutch.ledger.TestGroupConfiguration.ADMIN_SUBJECT;
 import static com.dutch.ledger.TestGroupConfiguration.MEMBER;
 import static com.dutch.ledger.TestGroupConfiguration.MEMBER_SUBJECT;
+import static com.dutch.ledger.TestGroupConfiguration.OUTSIDER;
 import static com.dutch.ledger.TestGroupConfiguration.OUTSIDER_SUBJECT;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -84,6 +85,28 @@ class GroupControllerTest {
                         .header("If-Match", "\"0\""))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("not_found"));
+    }
+
+    @Test
+    void a_non_member_self_activation_is_not_enumerable_before_the_version_check() throws Exception {
+        String groupId = createGroup();
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + OUTSIDER.value() + "/activate")
+                        .with(as(OUTSIDER_SUBJECT))
+                        .header("If-Match", "\"99\""))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("not_found"));
+    }
+
+    @Test
+    void a_missing_if_match_returns_the_published_error() throws Exception {
+        String groupId = createGroup();
+
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"mem_312345678901234567\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
     }
 
     @Test

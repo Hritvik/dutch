@@ -1,0 +1,41 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- tapOn: "Flat 12"
+- tapOn: "Record settlement"
+- assertVisible: "Who paid"
+- assertVisible: ".*group only, in INR.*"
+- tapOn:
+    id: "settlement-amount"
+- inputText: "50"
+- hideKeyboard
+- tapOn: "Review settlement"
+- assertVisible: "Scope"
+- assertVisible: "From"
+- assertVisible: "To"
+- takeScreenshot: android-settlement-review
+- tapOn: "Confirm settlement"
+- extendedWaitUntil:
+    visible: "Recorded"
+    timeout: 10000
+- assertVisible: ".*50.00 INR.*"
+- takeScreenshot: android-settlement-result
+- tapOn: "Void settlement"
+- tapOn: "Confirm void"
+- extendedWaitUntil:
+    visible: "Voided"
+    timeout: 10000
+- takeScreenshot: android-settlement-voided
+- tapOn: "Done"
+- scrollUntilVisible:
+    element: "Settlement voided"
+    direction: DOWN
+    timeout: 10000
+- takeScreenshot: android-s4-activity

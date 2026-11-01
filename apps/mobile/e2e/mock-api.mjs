@@ -27,7 +27,11 @@ function seedGroups() {
 }
 
 let groups = seedGroups();
-const expenses = new Map();
+let expensesByKey = new Map();
+let expensesById = new Map();
+let settlements = new Map();
+let activity = [];
+let settlementIdempotency = new Map();
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -59,11 +63,87 @@ function readBody(request) {
   });
 }
 
+function buildExpense(group, payload, expenseId, revision) {
+  const total = Number(payload.totalMinorUnits);
+  const participants = payload.participants ?? [];
+  const payers = payload.payers ?? [];
+  const base = Math.floor(total / participants.length);
+  const remainder = total % participants.length;
+  const shares = participants.map((memberId, index) => ({
+    memberId,
+    minorUnits: base + (index < remainder ? 1 : 0)
+  }));
+  const positions = new Map();
+  for (const payer of payers) {
+    positions.set(payer.memberId, (positions.get(payer.memberId) ?? 0) + payer.minorUnits);
+  }
+  for (const share of shares) {
+    positions.set(share.memberId, (positions.get(share.memberId) ?? 0) - share.minorUnits);
+  }
+  const debtors = [...positions].filter(([, value]) => value < 0)
+    .map(([memberId, value]) => ({ memberId, amount: -value }))
+    .sort((a, b) => b.amount - a.amount || a.memberId.localeCompare(b.memberId));
+  const creditors = [...positions].filter(([, value]) => value > 0)
+    .map(([memberId, value]) => ({ memberId, amount: value }))
+    .sort((a, b) => b.amount - a.amount || a.memberId.localeCompare(b.memberId));
+  const entries = [];
+  let debtorIndex = 0;
+  let creditorIndex = 0;
+  while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
+    const amount = Math.min(debtors[debtorIndex].amount, creditors[creditorIndex].amount);
+    if (amount > 0) {
+      entries.push({
+        expenseId,
+        revision,
+        debtor: debtors[debtorIndex].memberId,
+        creditor: creditors[creditorIndex].memberId,
+        minorUnits: amount,
+        currency: payload.currency,
+        algorithmVersion: 'expense-allocation-v1'
+      });
+    }
+    debtors[debtorIndex].amount -= amount;
+    creditors[creditorIndex].amount -= amount;
+    if (debtors[debtorIndex].amount === 0) debtorIndex += 1;
+    if (creditors[creditorIndex].amount === 0) creditorIndex += 1;
+  }
+  return {
+    id: expenseId,
+    groupId: group.id,
+    description: payload.description,
+    totalMinorUnits: total,
+    currency: payload.currency,
+    splitMethod: payload.splitMethod,
+    payers,
+    shares,
+    entries,
+    occurredAt: payload.occurredAt,
+    revision
+  };
+}
+
+function recordActivity(group, action, targetId, targetRevision, details) {
+  activity.push({
+    activityId: `act_${randomUUID().replaceAll('-', '')}`,
+    scopeId: `group:${group.id}:${group.currency}`,
+    actor: ADMIN_MEMBER,
+    action,
+    targetId,
+    targetRevision,
+    occurredAt: new Date().toISOString(),
+    details
+  });
+}
+
 const server = createServer(async (request, response) => {
   if (request.method === 'POST' && request.url === '/reset') {
     profileStateReads = 0;
     groups = seedGroups();
-    expenses.clear();
+    expensesByKey = new Map();
+    expensesById = new Map();
+    settlements = new Map();
+    activity = [];
+    settlementIdempotency = new Map();
     response.writeHead(204).end();
     return;
   }
@@ -112,70 +192,142 @@ const server = createServer(async (request, response) => {
     }
     if (request.method === 'POST' && parts[4] === 'expenses' && parts.length === 5) {
       const idempotencyKey = request.headers['idempotency-key'];
-      if (idempotencyKey && expenses.has(idempotencyKey)) {
-        json(response, 200, { data: expenses.get(idempotencyKey) });
+      if (idempotencyKey && expensesByKey.has(idempotencyKey)) {
+        json(response, 200, { data: expensesByKey.get(idempotencyKey) });
         return;
       }
       const payload = JSON.parse((await readBody(request)) || '{}');
-      const total = Number(payload.totalMinorUnits);
-      const participants = payload.participants ?? [];
-      const payers = payload.payers ?? [];
-      const base = Math.floor(total / participants.length);
-      const remainder = total % participants.length;
-      const shares = participants.map((memberId, index) => ({
-        memberId,
-        minorUnits: base + (index < remainder ? 1 : 0)
-      }));
-      const positions = new Map();
-      for (const payer of payers) {
-        positions.set(payer.memberId, (positions.get(payer.memberId) ?? 0) + payer.minorUnits);
-      }
-      for (const share of shares) {
-        positions.set(share.memberId, (positions.get(share.memberId) ?? 0) - share.minorUnits);
-      }
-      const debtors = [...positions].filter(([, value]) => value < 0)
-        .map(([memberId, value]) => ({ memberId, amount: -value }))
-        .sort((a, b) => b.amount - a.amount || a.memberId.localeCompare(b.memberId));
-      const creditors = [...positions].filter(([, value]) => value > 0)
-        .map(([memberId, value]) => ({ memberId, amount: value }))
-        .sort((a, b) => b.amount - a.amount || a.memberId.localeCompare(b.memberId));
       const expenseId = `exp_${randomUUID().replaceAll('-', '')}`;
-      const entries = [];
-      let debtorIndex = 0;
-      let creditorIndex = 0;
-      while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
-        const amount = Math.min(debtors[debtorIndex].amount, creditors[creditorIndex].amount);
-        if (amount > 0) {
-          entries.push({
-            expenseId,
-            revision: 1,
-            debtor: debtors[debtorIndex].memberId,
-            creditor: creditors[creditorIndex].memberId,
-            minorUnits: amount,
-            currency: payload.currency,
-            algorithmVersion: 'expense-allocation-v1'
-          });
-        }
-        debtors[debtorIndex].amount -= amount;
-        creditors[creditorIndex].amount -= amount;
-        if (debtors[debtorIndex].amount === 0) debtorIndex += 1;
-        if (creditors[creditorIndex].amount === 0) creditorIndex += 1;
-      }
-      const expense = {
-        id: expenseId,
-        groupId: group.id,
+      const expense = buildExpense(group, payload, expenseId, 1);
+      if (idempotencyKey) expensesByKey.set(idempotencyKey, expense);
+      expensesById.set(expenseId, expense);
+      recordActivity(group, 'EXPENSE_CREATED', expenseId, 1, {
         description: payload.description,
+        totalMinorUnits: String(payload.totalMinorUnits),
+        currency: payload.currency
+      });
+      json(response, 200, { data: expense });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'expenses' && parts[6] === 'corrections') {
+      const expenseId = parts[5];
+      const current = expensesById.get(expenseId);
+      if (!current || current.groupId !== group.id) {
+        json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+        return;
+      }
+      const correctionPayload = JSON.parse((await readBody(request)) || '{}');
+      // Fault injection: the amount 999.00 always answers stale_version so the
+      // device flow can prove that the Local Draft survives a stale correction.
+      if (Number(correctionPayload.totalMinorUnits) === 99900) {
+        json(response, 409, {
+          error: { code: 'stale_version', message: 'The group changed. Refresh and retry.' }
+        });
+        return;
+      }
+      const ifMatch = String(request.headers['if-match'] ?? '').replaceAll('"', '');
+      if (Number(ifMatch) !== current.revision) {
+        json(response, 409, {
+          error: { code: 'stale_version', message: 'The group changed. Refresh and retry.' }
+        });
+        return;
+      }
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (idempotencyKey && expensesByKey.has(idempotencyKey)) {
+        json(response, 200, { data: expensesByKey.get(idempotencyKey) });
+        return;
+      }
+      const payload = correctionPayload;
+      const revision = current.revision + 1;
+      const corrected = buildExpense(group, payload, expenseId, revision);
+      if (idempotencyKey) expensesByKey.set(idempotencyKey, corrected);
+      expensesById.set(expenseId, corrected);
+      recordActivity(group, 'EXPENSE_CORRECTED', expenseId, revision, {
+        description: payload.description,
+        totalMinorUnits: String(payload.totalMinorUnits),
+        currency: payload.currency,
+        fromRevision: String(current.revision),
+        toRevision: String(revision)
+      });
+      json(response, 200, { data: corrected });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'settlements' && parts.length === 5) {
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (idempotencyKey && settlementIdempotency.has(idempotencyKey)) {
+        json(response, 200, { data: settlementIdempotency.get(idempotencyKey) });
+        return;
+      }
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      const settlementId = `stl_${randomUUID().replaceAll('-', '')}`;
+      const total = Number(payload.totalMinorUnits);
+      const allocations = payload.allocations?.length
+        ? payload.allocations.map((allocation) => ({
+            scopeId: allocation.scopeId,
+            currency: payload.currency,
+            minorUnits: Number(allocation.minorUnits),
+            payer: payload.payerMemberId,
+            payee: payload.payeeMemberId
+          }))
+        : [{
+            scopeId: `group:${group.id}:${group.currency}`,
+            currency: payload.currency,
+            minorUnits: total,
+            payer: payload.payerMemberId,
+            payee: payload.payeeMemberId
+          }];
+      const settlement = {
+        id: settlementId,
+        groupId: group.id,
+        payer: payload.payerMemberId,
+        payee: payload.payeeMemberId,
         totalMinorUnits: total,
         currency: payload.currency,
-        splitMethod: payload.splitMethod,
-        payers,
-        shares,
-        entries,
-        occurredAt: payload.occurredAt,
-        revision: 1
+        status: 'ACTIVE',
+        allocations,
+        occurredAt: payload.occurredAt
       };
-      if (idempotencyKey) expenses.set(idempotencyKey, expense);
-      json(response, 200, { data: expense });
+      settlements.set(settlementId, settlement);
+      if (idempotencyKey) settlementIdempotency.set(idempotencyKey, settlement);
+      recordActivity(group, 'SETTLEMENT_RECORDED', settlementId, 1, {
+        totalMinorUnits: String(total),
+        currency: payload.currency,
+        status: 'ACTIVE'
+      });
+      json(response, 200, { data: settlement });
+      return;
+    }
+    if (request.method === 'POST' && parts[4] === 'settlements' && parts[6] === 'void' && parts[5]) {
+      const settlement = settlements.get(parts[5]);
+      if (!settlement || settlement.groupId !== group.id) {
+        json(response, 404, { error: { code: 'not_found', message: 'Resource was not found' } });
+        return;
+      }
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (idempotencyKey && settlementIdempotency.has(idempotencyKey)) {
+        json(response, 200, { data: settlementIdempotency.get(idempotencyKey) });
+        return;
+      }
+      if (settlement.status === 'VOIDED') {
+        json(response, 409, {
+          error: { code: 'conflict', message: 'The request conflicts with the current state.' }
+        });
+        return;
+      }
+      settlement.status = 'VOIDED';
+      if (idempotencyKey) settlementIdempotency.set(idempotencyKey, settlement);
+      recordActivity(group, 'SETTLEMENT_VOIDED', settlement.id, 2, {
+        totalMinorUnits: String(settlement.totalMinorUnits),
+        currency: settlement.currency,
+        status: 'VOIDED'
+      });
+      json(response, 200, { data: settlement });
+      return;
+    }
+    if (request.method === 'GET' && parts[4] === 'activity' && parts.length === 5) {
+      json(response, 200, {
+        data: activity.filter((entry) => entry.scopeId === `group:${group.id}:${group.currency}`)
+      });
       return;
     }
     if (request.method === 'POST' && parts[4] === 'members' && parts.length === 5) {

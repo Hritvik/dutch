@@ -25,6 +25,8 @@ import {
   type MembershipView
 } from '../../src/groups-client';
 import { fetchMemberProfile } from '../../src/profile-client';
+import { fetchActivity, type ActivityEntry } from '../../src/activity-client';
+import { formatMinor } from '../../src/expenses-client';
 
 const config = createAppConfig(process.env);
 
@@ -33,6 +35,7 @@ export default function GroupDetailScreen() {
   const router = useRouter();
   const [group, setGroup] = useState<GroupView | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [token, setToken] = useState<string | null>(null);
   const [inviteId, setInviteId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,6 +58,11 @@ export default function GroupDetailScreen() {
       } catch {
         setMemberId(null);
       }
+      try {
+        setActivity(await fetchActivity(config.apiBaseUrl, material.accessToken, id));
+      } catch {
+        setActivity([]);
+      }
       return true;
     } catch {
       setError('We could not load this group.');
@@ -72,6 +80,14 @@ export default function GroupDetailScreen() {
     setError(null);
     try {
       setGroup(await action());
+      const material = await sessionStore.load();
+      if (material) {
+        try {
+          setActivity(await fetchActivity(config.apiBaseUrl, material.accessToken, id));
+        } catch {
+          // Keep the last visible Activity when the refresh fails.
+        }
+      }
     } catch (failure) {
       if (failure instanceof GroupHttpError && failure.code === 'stale_version') {
         const refreshed = await refresh();
@@ -92,7 +108,7 @@ export default function GroupDetailScreen() {
     } finally {
       setBusy(false);
     }
-  }, [refresh]);
+  }, [id, refresh]);
 
   if (!group) {
     return (
@@ -120,15 +136,44 @@ export default function GroupDetailScreen() {
       {error ? <Text style={styles.notice}>{error}</Text> : null}
 
       {viewer?.state === 'ACTIVE' ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(`/expense/new?groupId=${group.id}`)}
-          style={styles.primary}
-        >
-          <Text style={styles.primaryLabel}>New expense</Text>
-        </Pressable>
+        <View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/expense/new?groupId=${group.id}`)}
+            style={styles.primary}
+          >
+            <Text style={styles.primaryLabel}>New expense</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/settlement/new?groupId=${group.id}`)}
+            style={styles.secondary}
+          >
+            <Text style={styles.secondaryLabel}>Record settlement</Text>
+          </Pressable>
+        </View>
       ) : null}
 
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Activity</Text>
+        {activity.length === 0 ? (
+          <Text style={styles.muted}>No activity recorded yet.</Text>
+        ) : activity.slice(-6).reverse().map((entry) => (
+          <View key={entry.activityId} style={styles.activityRow}>
+            <Text style={styles.activityAction}>{activityLabel(entry)}</Text>
+            <Text style={styles.muted}>
+              {entry.actor ? shortId(entry.actor) : 'Former member'}
+              {entry.details.totalMinorUnits
+                ? ` · ${formatMinor(Number(entry.details.totalMinorUnits),
+                    entry.details.currency ?? group.currency)}`
+                : ''}
+              {entry.action === 'EXPENSE_CORRECTED' && entry.details.fromRevision
+                ? ` · revision ${entry.details.fromRevision} to ${entry.details.toRevision}`
+                : ''}
+            </Text>
+          </View>
+        ))}
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Members</Text>
         {group.memberships.map((membership) => (
@@ -199,6 +244,29 @@ export default function GroupDetailScreen() {
       ) : null}
     </ScrollView>
   );
+}
+
+function activityLabel(entry: ActivityEntry): string {
+  switch (entry.action) {
+    case 'EXPENSE_CREATED':
+      return entry.details.description ?? 'Expense added';
+    case 'EXPENSE_CORRECTED':
+      return `${entry.details.description ?? 'Expense'} corrected`;
+    case 'SETTLEMENT_RECORDED':
+      return 'Settlement recorded';
+    case 'SETTLEMENT_VOIDED':
+      return 'Settlement voided';
+    case 'EXPENSE_DELETED':
+      return 'Expense deleted';
+    case 'EXPENSE_RESTORED':
+      return 'Expense restored';
+    default:
+      return 'Membership changed';
+  }
+}
+
+function shortId(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 7)}…${value.slice(-4)}` : value;
 }
 
 function MemberRow({
@@ -298,6 +366,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14
   },
   primaryLabel: { color: PAPER, fontSize: 15, fontWeight: '600' },
+  secondary: {
+    alignItems: 'center',
+    borderColor: ACCENT,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 12,
+    paddingVertical: 14
+  },
+  secondaryLabel: { color: ACCENT, fontSize: 15, fontWeight: '600' },
+  activityRow: { borderBottomColor: LINE, borderBottomWidth: 1, paddingVertical: 10 },
+  activityAction: { color: INK, fontSize: 14, fontWeight: '600' },
   quiet: { alignItems: 'center', marginTop: 24, paddingVertical: 10 },
   quietLabel: { color: MUTED, fontSize: 13, fontWeight: '600' }
 });

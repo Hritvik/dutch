@@ -13,11 +13,24 @@ import {
 import { createAppConfig } from '../../src/app-config';
 import { sessionStore } from '../../src/expo-session-store';
 import {
+  ExpenseHttpError,
   createExpense,
   formatMinor,
   parseMajorToMinor,
   type ExpenseView
 } from '../../src/expenses-client';
+import { correctExpense } from '../../src/corrections-client';
+import {
+  acceptCorrection,
+  createCorrectionDraft,
+  editCorrection,
+  equalShares,
+  markCorrectionStale,
+  reReviewCorrection,
+  reviewCorrection,
+  submitCorrection,
+  type CorrectionDraft
+} from '../../src/drafts';
 import { fetchGroup, type GroupView } from '../../src/groups-client';
 import { fetchMemberProfile } from '../../src/profile-client';
 
@@ -34,6 +47,11 @@ export default function NewExpenseScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ExpenseView | null>(null);
+  const [draft, setDraft] = useState<CorrectionDraft | null>(null);
+  const [correctionAmount, setCorrectionAmount] = useState('');
+  const [correctionStep, setCorrectionStep] = useState<'edit' | 'review'>('edit');
+  const [correcting, setCorrecting] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
   const idempotencyKey = useRef<string | null>(null);
   const occurredAt = useRef<string | null>(null);
 
@@ -97,6 +115,86 @@ export default function NewExpenseScreen() {
     }
   }, [amount, description, group, groupId, memberId, token]);
 
+  const startCorrection = useCallback(() => {
+    if (!result) return;
+    setCorrectionError(null);
+    setCorrectionStep('edit');
+    setCorrectionAmount((result.totalMinorUnits / 100).toFixed(2));
+    setDraft(createCorrectionDraft({
+      expenseId: result.id,
+      groupId: result.groupId,
+      baseRevision: result.revision,
+      description: result.description,
+      totalMinorUnits: result.totalMinorUnits
+    }));
+  }, [result]);
+
+  const reviewCorrectionDraft = useCallback(() => {
+    if (!draft) return;
+    setCorrectionError(null);
+    try {
+      const total = parseMajorToMinor(correctionAmount);
+      setDraft(reviewCorrection(editCorrection(draft, { totalMinorUnits: total })));
+      setCorrectionStep('review');
+    } catch (failure) {
+      setCorrectionError(failure instanceof Error ? failure.message : 'Enter a valid amount.');
+    }
+  }, [correctionAmount, draft]);
+
+  const confirmCorrection = useCallback(async () => {
+    if (!token || !group || !memberId || !draft || !result) return;
+    if (result.payers.length !== 1) {
+      setCorrectionError('This prototype can correct a single-payer expense only.');
+      return;
+    }
+    setCorrecting(true);
+    setCorrectionError(null);
+    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const submitting = submitCorrection(draft, key);
+    setDraft(submitting);
+    try {
+      const participants = group.memberships
+        .filter((membership) => membership.state === 'ACTIVE')
+        .map((membership) => membership.memberId);
+      const corrected = await correctExpense(
+        config.apiBaseUrl,
+        token,
+        group.id,
+        draft.expenseId,
+        key,
+        draft.baseRevision,
+        {
+          description: draft.description,
+          totalMinorUnits: draft.totalMinorUnits,
+          currency: result.currency,
+          splitMethod: 'EQUAL',
+          payers: [{ memberId: result.payers[0].memberId, minorUnits: draft.totalMinorUnits }],
+          participants,
+          occurredAt: result.occurredAt
+        }
+      );
+      setResult(corrected);
+      setDraft(acceptCorrection(submitting));
+      setCorrectionStep('edit');
+      setCorrectionError(null);
+    } catch (failure) {
+      if (failure instanceof ExpenseHttpError && failure.code === 'stale_version') {
+        setDraft(markCorrectionStale(submitting, result.revision));
+        setCorrectionStep('edit');
+        setCorrectionError(
+          'This expense changed. Your draft is kept. Review the latest state before submitting.');
+      } else if (failure instanceof ExpenseHttpError && failure.code === 'idempotency_conflict') {
+        setDraft(editCorrection(submitting, {}));
+        setCorrectionError('This draft was already sent with different details. Review it again.');
+      } else {
+        setDraft(editCorrection(submitting, {}));
+        setCorrectionError('We could not correct the expense. Your draft is kept; try again.');
+      }
+    } finally {
+      setCorrecting(false);
+    }
+  }, [draft, group, memberId, result, token]);
+
   if (result) {
     return (
       <ScrollView contentContainerStyle={styles.screen}>
@@ -128,6 +226,95 @@ export default function NewExpenseScreen() {
         <Text style={styles.muted}>
           {result.splitMethod} split · version {result.revision} · {result.entries[0]?.algorithmVersion ?? 'expense-allocation-v1'}
         </Text>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Correction</Text>
+          {!draft ? (
+            <Pressable accessibilityRole="button" onPress={startCorrection} style={styles.secondary}>
+              <Text style={styles.secondaryLabel}>Correct this expense</Text>
+            </Pressable>
+          ) : draft.state === 'accepted' ? (
+            <Text style={styles.muted}>Correction recorded at version {result.revision}.</Text>
+          ) : draft.state === 'staleNeedsReview' ? (
+            <View style={styles.review}>
+              {correctionError ? <Text style={styles.notice}>{correctionError}</Text> : null}
+              <Text style={styles.reviewValue}>
+                Draft kept: {formatMinor(draft.totalMinorUnits, result.currency)}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  setDraft(reReviewCorrection(draft));
+                  setCorrectionStep('review');
+                }}
+                style={styles.primary}
+              >
+                <Text style={styles.primaryLabel}>Review latest</Text>
+              </Pressable>
+            </View>
+          ) : correctionStep === 'review' ? (
+            <View style={styles.review}>
+              <Text style={styles.sectionLabel}>Scope</Text>
+              <Text style={styles.reviewValue}>{group?.name ?? groupId} · {result.currency}</Text>
+              <Text style={styles.sectionLabel}>Before</Text>
+              <Text style={styles.reviewValue}>
+                {formatMinor(result.totalMinorUnits, result.currency)} · you{' '}
+                {formatMinor(shareFor(result, memberId), result.currency)}
+              </Text>
+              <Text style={styles.sectionLabel}>After</Text>
+              <Text style={styles.reviewValue}>
+                {formatMinor(draft.totalMinorUnits, result.currency)} · you{' '}
+                {formatMinor(projectedShare(draft, group, memberId), result.currency)}
+              </Text>
+              <Text style={styles.muted}>
+                A correction appends a new revision and reverses the previous entries. Activity
+                records both revisions.
+              </Text>
+              {correctionError ? <Text style={styles.notice}>{correctionError}</Text> : null}
+              <Pressable
+                accessibilityRole="button"
+                disabled={correcting}
+                onPress={confirmCorrection}
+                style={styles.primary}
+              >
+                {correcting ? <ActivityIndicator color={PAPER} /> : (
+                  <Text style={styles.primaryLabel}>Confirm correction</Text>
+                )}
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCorrectionStep('edit')}
+                style={styles.quiet}
+              >
+                <Text style={styles.quietLabel}>Keep editing</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.review}>
+              <Text style={styles.label}>New amount ({result.currency})</Text>
+              <TextInput
+                keyboardType="decimal-pad"
+                onChangeText={(value) => {
+                  setCorrectionError(null);
+                  setCorrectionAmount(value);
+                }}
+                placeholder={formatMinor(result.totalMinorUnits, result.currency)}
+                placeholderTextColor={MUTED}
+                style={styles.input}
+                testID="correction-amount"
+                value={correctionAmount}
+              />
+              {correctionError ? <Text style={styles.notice}>{correctionError}</Text> : null}
+              <Pressable
+                accessibilityRole="button"
+                onPress={reviewCorrectionDraft}
+                style={styles.primary}
+              >
+                <Text style={styles.primaryLabel}>Review correction</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -198,6 +385,20 @@ export default function NewExpenseScreen() {
   );
 }
 
+function shareFor(expense: ExpenseView, memberId: string | null): number {
+  return expense.shares.find((share) => share.memberId === memberId)?.minorUnits ?? 0;
+}
+
+function projectedShare(draft: CorrectionDraft, group: GroupView | null,
+                        memberId: string | null): number {
+  if (!group || !memberId) return 0;
+  const participants = group.memberships
+    .filter((membership) => membership.state === 'ACTIVE')
+    .map((membership) => membership.memberId);
+  return equalShares(draft.totalMinorUnits, participants)
+    .find((share) => share.memberId === memberId)?.minorUnits ?? 0;
+}
+
 function shortId(value: string): string {
   return value.length > 12 ? `${value.slice(0, 7)}…${value.slice(-4)}` : value;
 }
@@ -240,5 +441,18 @@ const styles = StyleSheet.create({
     paddingVertical: 15
   },
   primaryDisabled: { opacity: 0.6 },
-  primaryLabel: { color: PAPER, fontSize: 15, fontWeight: '600' }
+  primaryLabel: { color: PAPER, fontSize: 15, fontWeight: '600' },
+  secondary: {
+    alignItems: 'center',
+    borderColor: ACCENT,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+    paddingVertical: 13
+  },
+  secondaryLabel: { color: ACCENT, fontSize: 15, fontWeight: '600' },
+  review: { backgroundColor: '#fff', borderColor: LINE, borderRadius: 16, borderWidth: 1, marginTop: 10, padding: 16 },
+  reviewValue: { color: INK, fontSize: 15, marginTop: 4 },
+  quiet: { alignItems: 'center', marginTop: 14, paddingVertical: 10 },
+  quietLabel: { color: ACCENT, fontSize: 14, fontWeight: '600' }
 });

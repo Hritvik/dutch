@@ -56,6 +56,43 @@ class ProfileStateControllerTest {
     }
 
     @Test
+    void profileStateReportsRequiredForAnUnknownSubject() throws Exception {
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/v1/me/profile-state").with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("PROFILE_REQUIRED"))
+                .andExpect(jsonPath("$.data.appSubject").doesNotExist())
+                .andExpect(jsonPath("$.data.memberId").doesNotExist());
+    }
+
+    @Test
+    void profileStateReportsProvisioningAndReady() throws Exception {
+        var provisioning = new MemberProfile("mem_212345678901234567", "dutch-development", SUBJECT, null,
+                ProfileState.PROFILE_PROVISIONING, MemberLifecycleState.ACTIVE, 1,
+                Instant.parse("2026-10-31T00:00:00Z"));
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.of(provisioning));
+        mvc.perform(get("/api/v1/me/profile-state").with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.state").value("PROFILE_PROVISIONING"));
+
+        var ready = new MemberProfile("mem_312345678901234567", "dutch-development", SUBJECT, "Ada",
+                ProfileState.PROFILE_READY, MemberLifecycleState.ACTIVE, 1,
+                Instant.parse("2026-10-31T00:00:00Z"));
+        when(profiles.findByAppSubject(ProfileStateController.APP, SUBJECT)).thenReturn(Optional.of(ready));
+        mvc.perform(get("/api/v1/me/profile-state").header("X-Correlation-Id", "7af1f54e-c812-49b9-9837-5c0a1b25c0eb")
+                        .with(jwt().jwt(j -> j.subject(SUBJECT))))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Correlation-Id", "7af1f54e-c812-49b9-9837-5c0a1b25c0eb"))
+                .andExpect(jsonPath("$.data.state").value("PROFILE_READY"));
+    }
+
+    @Test
+    void profileStateRejectsUnauthenticatedRequests() throws Exception {
+        mvc.perform(get("/api/v1/me/profile-state")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void aSuspendedProfileIsNotReportedAsReady() throws Exception {
         var profile = new MemberProfile("mem_112345678901234567", "dutch-development", SUBJECT, null,
                 ProfileState.PROFILE_REQUIRED, MemberLifecycleState.SUSPENDED, 1,

@@ -19,6 +19,16 @@ public final class ProfileStateController {
         this.profiles = profiles;
     }
 
+    @GetMapping("/me/profile-state")
+    ResponseEntity<Map<String, Object>> getProfileState(Authentication authentication) {
+        String appSubject = authentication.getName();
+        var profile = profiles.findByAppSubject(APP, appSubject);
+        var state = profile.map(MemberProfile::profileState).orElse(ProfileState.PROFILE_REQUIRED);
+        var data = new LinkedHashMap<String, Object>();
+        data.put("state", state.name());
+        return ResponseEntity.ok(Map.of("data", data));
+    }
+
     @GetMapping("/me")
     ResponseEntity<Map<String, Object>> getProfile(Authentication authentication, HttpServletRequest request) {
         String correlationId = (String) request.getAttribute(CorrelationIdFilter.ATTRIBUTE);

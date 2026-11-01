@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dutch mobile information architecture</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #e9edf2;
+      color: #17202a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% 10%, #fff 0, #edf1f5 38%, #dfe5ec 100%); }
+    button { font: inherit; }
+    #stage { min-height: 100vh; display: grid; place-items: center; padding: 88px 16px 32px; }
+    .phone {
+      position: relative;
+      width: min(100%, 390px);
+      height: min(812px, calc(100vh - 120px));
+      min-height: 650px;
+      overflow: hidden;
+      background: #f8fafc;
+      border: 1px solid rgba(29, 42, 57, .12);
+      border-radius: 36px;
+      box-shadow: 0 32px 80px rgba(34, 53, 74, .2), 0 2px 8px rgba(34, 53, 74, .08);
+      animation: phone-in 220ms ease-out both;
+    }
+    @keyframes phone-in { from { opacity: 0; transform: translateY(8px) scale(.992); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .phone, .sheet { animation: none !important; } }
+    .status { height: 36px; padding: 12px 22px 0; display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; }
+    .screen { height: calc(100% - 36px); overflow-y: auto; padding-bottom: 94px; scrollbar-width: none; }
+    .screen::-webkit-scrollbar { display: none; }
+    .topbar { min-height: 58px; padding: 8px 20px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .eyebrow { margin: 0 0 3px; color: #667384; font-size: 12px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: 26px; line-height: 1.1; letter-spacing: -.6px; }
+    h2 { margin-bottom: 12px; font-size: 17px; letter-spacing: -.2px; }
+    h3 { margin-bottom: 4px; font-size: 15px; }
+    .avatar { width: 40px; height: 40px; border: 0; border-radius: 50%; background: #dce8ff; color: #24539d; font-weight: 800; cursor: pointer; }
+    .icon-button { width: 44px; height: 44px; border: 0; border-radius: 50%; background: transparent; color: #405064; cursor: pointer; }
+    .pad { padding: 0 20px; }
+    .section { margin-top: 24px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .section-head h2 { margin: 0; }
+    .text-button { min-height: 44px; border: 0; background: transparent; color: #2d65bd; font-weight: 700; cursor: pointer; }
+    .money { font-variant-numeric: tabular-nums; letter-spacing: -.6px; }
+    .positive { color: #087d55; }
+    .negative { color: #b5473c; }
+    .muted { color: #6f7d8e; }
+    .bottom-nav { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; min-height: 76px; padding: 8px 12px 14px; display: flex; justify-content: space-around; align-items: end; background: rgba(255,255,255,.94); border-top: 1px solid #e4e9ef; backdrop-filter: blur(14px); }
+    .nav-item { min-width: 62px; min-height: 52px; padding: 5px 7px; border: 0; border-radius: 14px; background: transparent; color: #7b8794; font-size: 11px; cursor: pointer; }
+    .nav-item span { display: block; margin-bottom: 4px; font-size: 20px; line-height: 1; }
+    .nav-item.active { color: #215fb8; background: #edf4ff; font-weight: 800; }
+    .fab { position: absolute; z-index: 8; right: 20px; bottom: 92px; width: 58px; height: 58px; border: 0; border-radius: 19px; background: #1768d1; color: white; box-shadow: 0 12px 28px rgba(23,104,209,.3); font-size: 28px; cursor: pointer; transition: transform 150ms ease-out; }
+    .fab:active, .primary:active, .action-chip:active { transform: scale(.97); }
+    .summary-card { padding: 22px; border-radius: 24px; background: linear-gradient(145deg, #123f7e, #1768d1); color: white; box-shadow: 0 16px 36px rgba(20,81,160,.2); }
+    .summary-card .label { color: rgba(255,255,255,.72); font-size: 13px; }
+    .summary-card .amount { margin: 8px 0 16px; font-size: 36px; font-weight: 800; }
+    .summary-pairs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .summary-pairs div { padding: 12px; border-radius: 16px; background: rgba(255,255,255,.1); }
+    .summary-pairs small { display: block; margin-bottom: 5px; color: rgba(255,255,255,.7); }
+    .card-list { display: grid; gap: 10px; }
+    .row-card { width: 100%; min-height: 74px; padding: 14px; display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; text-align: left; border: 1px solid #e6ebf0; border-radius: 18px; background: white; cursor: pointer; }
+    .row-card .tile { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 15px; background: #eff5ff; font-size: 21px; }
+    .row-card p { margin: 0; font-size: 12px; }
+    .row-card strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+    .empty { margin: 24px 20px; padding: 28px 20px; border: 1px dashed #cad3dd; border-radius: 20px; text-align: center; color: #667384; }
+    .sheet-backdrop { position: absolute; z-index: 20; inset: 0; display: grid; align-items: end; background: rgba(15,25,38,.36); }
+    .sheet { padding: 22px 20px 30px; border-radius: 28px 28px 0 0; background: white; animation: sheet-up 200ms ease-out both; }
+    @keyframes sheet-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+    .sheet-handle { width: 42px; height: 4px; margin: -8px auto 20px; border-radius: 8px; background: #d5dbe2; }
+    .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .quick-action { min-height: 96px; padding: 16px; border: 1px solid #e2e8ef; border-radius: 18px; background: #f8fafc; text-align: left; cursor: pointer; }
+    .quick-action span { display: block; margin-bottom: 10px; font-size: 23px; }
+    .primary { width: 100%; min-height: 50px; margin-top: 16px; border: 0; border-radius: 16px; background: #1768d1; color: white; font-weight: 800; cursor: pointer; }
+
+    /* Spaces First */
+    .spaces { background: #fffaf2; }
+    .spaces .topbar { padding-top: 10px; }
+    .spaces h1 { font-family: Georgia, serif; font-size: 29px; }
+    .space-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .space-card { min-height: 142px; padding: 16px; border: 0; border-radius: 24px; text-align: left; cursor: pointer; color: #31353c; }
+    .space-card:nth-child(1) { background: #dceee5; }
+    .space-card:nth-child(2) { background: #f4dfd6; }
+    .space-card:nth-child(3) { background: #e3e2f4; }
+    .space-card:nth-child(4) { background: #f4e9c7; }
+    .space-card .emoji { font-size: 28px; }
+    .space-card h3 { margin-top: 26px; }
+    .space-card p { margin: 0; font-size: 12px; color: #616a70; }
+    .spaces .bottom-nav { background: rgba(255,250,242,.96); border-color: #ebe3d8; }
+    .spaces .nav-item.active { color: #8c4c26; background: #f7e6da; }
+    .spaces .fab { left: 50%; right: auto; bottom: 28px; transform: translateX(-50%); background: #1f2827; border-radius: 50%; }
+    .spaces .fab:active { transform: translateX(-50%) scale(.97); }
+    .space-detail { padding: 4px 20px; }
+    .space-hero { padding: 18px; border-radius: 24px; background: #dceee5; }
+    .member-stack { display: flex; margin-top: 16px; }
+    .member-stack span { width: 32px; height: 32px; margin-right: -6px; display: grid; place-items: center; border: 2px solid #dceee5; border-radius: 50%; background: white; font-size: 11px; font-weight: 800; }
+
+    /* Activity First */
+    .activity-first { background: #f5f2eb; }
+    .activity-first .topbar { align-items: start; }
+    .activity-first h1 { font-size: 30px; }
+    .balance-strip { margin: 4px 20px 20px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; border-radius: 18px; background: #202b2a; color: white; }
+    .balance-strip small { display: block; margin-bottom: 4px; color: #b8c5c3; }
+    .timeline { position: relative; padding: 0 20px 116px 50px; }
+    .timeline::before { content: ""; position: absolute; left: 30px; top: 4px; bottom: 0; width: 1px; background: #d2d0ca; }
+    .event { position: relative; margin-bottom: 12px; padding: 15px; border-radius: 16px; background: white; border: 1px solid #e6e2db; }
+    .event::before { content: ""; position: absolute; left: -27px; top: 20px; width: 10px; height: 10px; border: 3px solid #f5f2eb; border-radius: 50%; background: #d17a42; }
+    .event p { margin: 4px 0 0; color: #69716f; font-size: 12px; line-height: 1.45; }
+    .event time { color: #89908e; font-size: 11px; }
+    .action-dock { position: absolute; z-index: 7; left: 16px; right: 16px; bottom: 18px; padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-radius: 21px; background: #202b2a; box-shadow: 0 14px 34px rgba(26,36,35,.28); }
+    .action-chip { min-height: 48px; border: 0; border-radius: 15px; background: transparent; color: white; font-weight: 800; cursor: pointer; }
+    .action-chip.primary-action { background: #f39a5c; color: #222; }
+    .scope-switch { display: flex; margin: 0 20px 18px; padding: 4px; border-radius: 14px; background: #e7e3dc; }
+    .scope-switch button { flex: 1; min-height: 38px; border: 0; border-radius: 11px; background: transparent; color: #6f7472; cursor: pointer; }
+    .scope-switch button.active { background: white; color: #202b2a; box-shadow: 0 2px 8px rgba(32,43,42,.08); font-weight: 800; }
+
+    .toast { position: absolute; z-index: 30; left: 20px; right: 20px; bottom: 96px; padding: 14px 16px; border-radius: 15px; background: #15202b; color: white; font-size: 13px; box-shadow: 0 12px 30px rgba(0,0,0,.2); }
+
+    .proto-picker {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(10, 10, 10, 0.82);
+      -webkit-backdrop-filter: blur(12px) saturate(1.4);
+      backdrop-filter: blur(12px) saturate(1.4);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 8px 24px rgba(0, 0, 0, 0.24),
+        0 2px 6px rgba(0, 0, 0, 0.12);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      line-height: 1;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .proto-picker-highlight {
+      position: absolute;
+      top: 4px;
+      left: 0;
+      height: 28px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      will-change: transform;
+    }
+    .proto-picker[data-ready] .proto-picker-highlight {
+      transition:
+        transform 250ms cubic-bezier(0.23, 1, 0.32, 1),
+        width 250ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .proto-picker[data-ready] .proto-picker-highlight { transition: none; }
+    }
+    .proto-picker-item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.55);
+      font: inherit;
+      cursor: pointer;
+      transition: color 150ms ease-out;
+    }
+    .proto-picker-item:hover { color: rgba(255, 255, 255, 0.85); }
+    .proto-picker-item:active { transform: scale(0.97); }
+    .proto-picker-item:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.4); outline-offset: 2px; }
+    .proto-picker-item[data-active] { color: #fff; }
+    .proto-picker-divider { width: 1px; height: 16px; margin: 0 4px; background: rgba(255, 255, 255, 0.12); }
+    .proto-picker-replay { padding: 0 10px; font-size: 14px; }
+    .proto-picker[data-position="top"] { bottom: auto; top: 24px; }
+  </style>
+</head>
+<body>
+  <main id="stage"></main>
+  <nav class="proto-picker" aria-label="Prototype variants" data-position="top">
+    <span class="proto-picker-highlight" aria-hidden="true"></span>
+    <button class="proto-picker-item" data-active aria-current="true">Balance First</button>
+    <button class="proto-picker-item">Spaces First</button>
+    <button class="proto-picker-item">Activity First</button>
+    <span class="proto-picker-divider" aria-hidden="true"></span>
+    <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
+  </nav>
+  <script>
+    const views = ['home', 'groups', 'activity'];
+    const overlays = [null, null, null];
+
+    const status = () => `<div class="status"><span>9:41</span><span>●●●  5G  ▰</span></div>`;
+    const expenseSheet = (accent = '#1768d1') => `
+      <div class="sheet-backdrop" data-action="close">
+        <section class="sheet" role="dialog" aria-modal="true" aria-label="Quick actions" data-stop>
+          <div class="sheet-handle"></div><h2>What do you want to do?</h2>
+          <div class="quick-actions">
+            <button class="quick-action" data-action="confirm"><span>＋</span><strong>Add expense</strong><br><small class="muted">Split a new cost</small></button>
+            <button class="quick-action" data-action="confirm"><span>✓</span><strong>Record settlement</strong><br><small class="muted">Paid outside Dutch</small></button>
+          </div>
+          <button class="primary" style="background:${accent}" data-action="close">Cancel</button>
+        </section>
+      </div>`;
+
+    function balanceFirst() {
+      const view = views[0];
+      const content = view === 'home' ? `
+        <div class="topbar"><div><p class="eyebrow">Sunday, 2 August</p><h1>Good morning, Riya</h1></div><button class="avatar" data-nav="profile">RS</button></div>
+        <div class="pad"><section class="summary-card"><div class="label">Your overall balance</div><div class="amount money">₹1,840 owed to you</div><div class="summary-pairs"><div><small>You owe</small><strong class="money">₹760</strong></div><div><small>You are owed</small><strong class="money">₹2,600</strong></div></div></section>
+        <section class="section"><div class="section-head"><h2>Needs attention</h2><button class="text-button" data-nav="activity">View activity</button></div><div class="card-list">
+          <button class="row-card" data-action="group"><span class="tile">🏠</span><span><h3>Koramangala Flat</h3><p class="muted">Arjun added Internet · today</p></span><strong class="positive">+₹1,240</strong></button>
+          <button class="row-card" data-action="group"><span class="tile">🏖️</span><span><h3>Goa Weekend</h3><p class="muted">3 unsettled expenses</p></span><strong class="negative">−₹760</strong></button>
+        </div></section></div>` : view === 'groups' ? `
+        <div class="topbar"><h1>Your groups</h1><button class="icon-button">⌕</button></div><div class="pad card-list">
+          <button class="row-card"><span class="tile">🏠</span><span><h3>Koramangala Flat</h3><p>4 members · INR</p></span><strong class="positive">+₹1,240</strong></button>
+          <button class="row-card"><span class="tile">🏖️</span><span><h3>Goa Weekend</h3><p>6 members · INR</p></span><strong class="negative">−₹760</strong></button>
+          <button class="row-card"><span class="tile">🍜</span><span><h3>Friday dinners</h3><p>5 members · INR</p></span><strong>Settled</strong></button></div>` : `
+        <div class="topbar"><h1>Activity</h1><button class="icon-button">⋯</button></div><div class="pad card-list">
+          <div class="row-card"><span class="tile">🌐</span><span><h3>Arjun added Internet</h3><p>Koramangala Flat · ₹1,499</p></span><strong>10m</strong></div>
+          <div class="row-card"><span class="tile">✎</span><span><h3>Meera edited Dinner</h3><p>Split changed from equal to exact</p></span><strong>2h</strong></div></div>`;
+      return `<article class="phone">${status()}<div class="screen">${content}</div>
+        <button class="fab" aria-label="Add" data-action="open">＋</button>
+        <nav class="bottom-nav"><button class="nav-item ${view==='home'?'active':''}" data-view="0:home"><span>⌂</span>Home</button><button class="nav-item ${view==='groups'?'active':''}" data-view="0:groups"><span>◫</span>Groups</button><button class="nav-item ${view==='activity'?'active':''}" data-view="0:activity"><span>◷</span>Activity</button><button class="nav-item"><span>◎</span>You</button></nav>${overlays[0] ? expenseSheet() : ''}</article>`;
+    }
+
+    function spacesFirst() {
+      const view = views[1];
+      const content = view === 'detail' ? `
+        <div class="topbar"><button class="icon-button" data-view="1:groups">←</button><button class="icon-button">•••</button></div><div class="space-detail"><section class="space-hero"><span style="font-size:34px">🏠</span><h1 style="margin-top:12px">Koramangala Flat</h1><p class="muted">You are owed <strong class="positive">₹1,240</strong></p><div class="member-stack"><span>RS</span><span>AM</span><span>NK</span><span>+1</span></div></section>
+        <section class="section"><div class="section-head"><h2>Recent expenses</h2><button class="text-button" data-action="open">Add</button></div><div class="card-list"><div class="row-card"><span class="tile">🌐</span><span><h3>Internet</h3><p>Paid by Arjun · equal split</p></span><strong>₹1,499</strong></div><div class="row-card"><span class="tile">🧹</span><span><h3>Housekeeping</h3><p>Paid by you · exact split</p></span><strong>₹2,400</strong></div></div></section></div>` : `
+        <div class="topbar"><div><p class="eyebrow">Shared with your people</p><h1>Your spaces</h1></div><button class="avatar">RS</button></div><div class="pad"><div class="section-head"><p class="muted" style="margin:0">4 active groups</p><button class="text-button">＋ New group</button></div><div class="space-grid">
+          <button class="space-card" data-view="1:detail"><span class="emoji">🏠</span><h3>Koramangala Flat</h3><p class="positive">You get ₹1,240</p></button>
+          <button class="space-card" data-view="1:detail"><span class="emoji">🏖️</span><h3>Goa Weekend</h3><p class="negative">You owe ₹760</p></button>
+          <button class="space-card"><span class="emoji">🍜</span><h3>Friday dinners</h3><p>All settled</p></button>
+          <button class="space-card"><span class="emoji">＋</span><h3>Start a space</h3><p>Invite friends later</p></button></div>
+        <section class="section"><div class="section-head"><h2>Direct expenses</h2><button class="text-button">See all</button></div><button class="row-card"><span class="tile">A</span><span><h3>Arjun Mehta</h3><p>Last activity yesterday</p></span><strong class="positive">+₹600</strong></button></section></div>`;
+      return `<article class="phone spaces">${status()}<div class="screen">${content}</div>${view !== 'detail' ? `<button class="fab" aria-label="Add expense" data-action="open">＋</button><nav class="bottom-nav"><button class="nav-item active"><span>◫</span>Spaces</button><button class="nav-item"><span>♙</span>People</button><span style="width:62px"></span><button class="nav-item"><span>◷</span>Activity</button><button class="nav-item"><span>◎</span>You</button></nav>` : ''}${overlays[1] ? expenseSheet('#1f2827') : ''}</article>`;
+    }
+
+    function activityFirst() {
+      const view = views[2];
+      const events = view === 'all' ? `
+        <div class="event"><time>10 minutes ago</time><h3>Arjun added Internet · ₹1,499</h3><p>Koramangala Flat · You owe ₹375</p></div>
+        <div class="event"><time>2 hours ago</time><h3>Meera corrected Dinner</h3><p>Goa Weekend · your share changed from ₹540 to ₹620</p></div>
+        <div class="event"><time>Yesterday</time><h3>You recorded a ₹1,200 settlement</h3><p>Nikhil confirmed the payment outside Dutch</p></div>` : `
+        <div class="event"><time>10 minutes ago</time><h3>Internet changed your balance</h3><p>You now owe Arjun ₹375 in Koramangala Flat.</p></div>
+        <div class="event"><time>2 hours ago</time><h3>Dinner was corrected</h3><p>Your share increased by ₹80. View what Meera changed.</p></div>`;
+      return `<article class="phone activity-first">${status()}<div class="screen"><div class="topbar"><div><p class="eyebrow">Your shared money</p><h1>Today</h1></div><button class="avatar">RS</button></div>
+        <section class="balance-strip"><div><small>Overall</small><strong class="money">You get ₹1,840</strong></div><button class="icon-button" style="color:white" data-action="group">›</button></section>
+        <div class="scope-switch"><button class="${view==='relevant'?'active':''}" data-view="2:relevant">For you</button><button class="${view==='all'?'active':''}" data-view="2:all">Everything</button></div>
+        <div class="timeline">${events}</div></div><div class="action-dock"><button class="action-chip" data-action="settle">✓ Settle</button><button class="action-chip primary-action" data-action="open">＋ Add expense</button></div>${overlays[2] ? expenseSheet('#202b2a') : ''}</article>`;
+    }
+
+    const variants = [balanceFirst, spacesFirst, activityFirst];
+    const stage = document.getElementById('stage');
+    const picker = document.querySelector('.proto-picker');
+    const highlight = picker.querySelector('.proto-picker-highlight');
+    const items = [...picker.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')];
+    const replay = picker.querySelector('.proto-picker-replay');
+    let current = 0;
+
+    function moveHighlight() {
+      const el = items[current];
+      highlight.style.width = el.offsetWidth + 'px';
+      highlight.style.transform = `translateX(${el.offsetLeft}px)`;
+    }
+    function mount(i) {
+      stage.innerHTML = '';
+      requestAnimationFrame(() => { stage.innerHTML = variants[i](); });
+    }
+    function setActive(i) {
+      if (i < 0 || i >= variants.length) return;
+      current = i;
+      items.forEach((el, j) => {
+        el.toggleAttribute('data-active', j === i);
+        if (j === i) el.setAttribute('aria-current', 'true');
+        else el.removeAttribute('aria-current');
+      });
+      moveHighlight();
+      const url = new URL(location);
+      url.searchParams.set('v', i + 1);
+      history.replaceState(null, '', url);
+      mount(i);
+    }
+    items.forEach((el, i) => el.addEventListener('click', () => setActive(i)));
+    replay?.addEventListener('click', () => mount(current));
+    window.addEventListener('resize', moveHighlight);
+    document.addEventListener('keydown', (e) => {
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const num = parseInt(e.key, 10);
+      if (num >= 1 && num <= variants.length) setActive(num - 1);
+      else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+      else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+      else if (e.key === 'r' || e.key === 'R') mount(current);
+    });
+    stage.addEventListener('click', (e) => {
+      if (e.target.closest('[data-stop]')) e.stopPropagation();
+      const view = e.target.closest('[data-view]')?.dataset.view;
+      if (view) { const [variant, next] = view.split(':'); views[Number(variant)] = next; mount(current); return; }
+      const action = e.target.closest('[data-action]')?.dataset.action;
+      if (action === 'open' || action === 'settle') { overlays[current] = 'sheet'; mount(current); }
+      else if (action === 'close') { overlays[current] = null; mount(current); }
+      else if (action === 'confirm') { overlays[current] = null; mount(current); setTimeout(() => { const phone = stage.querySelector('.phone'); if (phone) phone.insertAdjacentHTML('beforeend', '<div class="toast">Draft started — your changes are saved locally.</div>'); }, 0); }
+      else if (action === 'group') { views[current] = current === 1 ? 'detail' : views[current]; mount(current); }
+    });
+    setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
+    requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
+  </script>
+</body>
+</html>

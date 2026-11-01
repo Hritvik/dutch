@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dutch — mobile sync state prototype</title>
+<style>
+  :root { color-scheme: light; font: 16px/1.45 system-ui, sans-serif; color: #16251d; background: #f7f7f2; }
+  body { max-width: 880px; margin: 40px auto; padding: 0 20px 48px; }
+  h1 { margin-bottom: 4px; } .note { color: #526159; margin-top: 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0; }
+  button { background: #fff; border: 1px solid #b8c3ba; border-radius: 8px; padding: 9px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: #1d6844; background: #eff8f1; }
+  .card { background: #fff; border: 1px solid #dce3dc; border-radius: 12px; padding: 18px; margin: 14px 0; }
+  .state { display: grid; grid-template-columns: 180px 1fr; gap: 8px; } .label { color: #526159; }
+  code, pre { background: #edf1ed; border-radius: 5px; padding: 2px 5px; } pre { padding: 14px; overflow: auto; }
+  .event { font-weight: 650; color: #1d6844; }
+</style>
+<body>
+  <h1>Mobile cache &amp; draft state</h1>
+  <p class="note">Throwaway logic prototype. It explores what the app keeps locally and what the user sees; it does not connect to Dutch.</p>
+  <div class="controls">
+    <button onclick="resetState()">Reset</button>
+    <button onclick="offlineDraft()">1. Draft offline</button>
+    <button onclick="changedBeforeSend()">2. Server changed</button>
+    <button onclick="lostResponse()">3. Lost success response</button>
+    <button onclick="revokedAccess()">4. Access revoked</button>
+    <button onclick="expiredCursor()">5. Cursor expired</button>
+  </div>
+  <section class="card"><div class="state" id="state"></div></section>
+  <section class="card"><h2>What the user sees</h2><p id="message"></p><p class="note" id="next"></p></section>
+  <section class="card"><h2>Raw local state</h2><pre id="raw"></pre></section>
+<script>
+  const fresh = () => ({
+    network: 'online', cache: { groups: ['Weekend trip'], lastSyncedAt: '10:30', cursor: 'opaque-cursor-1842' },
+    draft: null, event: 'Authoritative cache is current', message: 'Balances were updated at 10:30.', next: 'You may read cached data or start a draft.'
+  });
+  let state = fresh();
+  function offlineDraft() { state = { ...state, network: 'offline', draft: { type: 'expense', status: 'local draft', baseVersion: 7, idempotencyKey: '9c4…', fields: 'Dinner ₹1,450, 3 people' }, event: 'Draft saved locally while offline', message: 'You’re offline. This expense is saved as a draft and has not been added.', next: 'Reconnect to review it against the latest group before submitting.' }; render(); }
+  function changedBeforeSend() { state = { ...state, network: 'online', draft: { type: 'expense edit', status: 'needs review', baseVersion: 7, serverVersion: 8, idempotencyKey: '9c4…', fields: 'Dinner ₹1,450', serverChange: 'Ravi changed the split' }, event: 'Sync found a newer server revision', message: 'This draft needs review: Ravi changed the split while you were offline.', next: 'Compare your draft with the current version. Reload or intentionally apply changes; never auto-merge money fields.' }; render(); }
+  function lostResponse() { state = { ...state, network: 'online', draft: { type: 'settlement', status: 'submission uncertain', idempotencyKey: '9c4…', fields: '₹800 to Asha' }, event: 'Connection ended after submission', message: 'We’re checking whether this settlement was recorded.', next: 'Retry with the same key. The server returns the original outcome or accepts it once—never twice.' }; render(); }
+  function revokedAccess() { state = { ...state, cache: { groups: [], lastSyncedAt: '10:31', cursor: 'opaque-cursor-1843' }, draft: null, event: 'Sync tombstone removed Group access', message: 'You no longer have access to Weekend trip. Its cached data was removed.', next: 'Other authorized cache and drafts remain available.' }; render(); }
+  function expiredCursor() { state = { ...state, cache: { ...state.cache, cursor: null }, event: 'Server returned sync_cursor_expired', message: 'Your cached view may be out of date. Refreshing all data you can currently access.', next: 'Keep drafts, but fetch a fresh authorized baseline before allowing their submission.' }; render(); }
+  function resetState() { state = fresh(); render(); }
+  function render() {
+    document.getElementById('state').innerHTML = `<span class="label">Network</span><span>${state.network}</span><span class="label">Cache</span><span>${state.cache.groups.length ? state.cache.groups.join(', ') : 'no accessible group data'} · last synced ${state.cache.lastSyncedAt}</span><span class="label">Draft</span><span>${state.draft ? state.draft.status : 'none'}</span><span class="label">Event</span><span class="event">${state.event}</span>`;
+    document.getElementById('message').textContent = state.message; document.getElementById('next').textContent = state.next;
+    document.getElementById('raw').textContent = JSON.stringify(state, null, 2);
+  } render();
+</script>
+</body>
+</html>

@@ -261,6 +261,7 @@ export default function HomeScreen() {
           ledgerAvailable={session.ledgerAvailable}
           onOpenGroups={() => router.push('/groups')}
           onOpenDirect={() => router.push('/direct/new')}
+          onOpenNotifications={() => router.push('/notifications')}
           syncStatus={syncStatus}
           onSignOut={signOut}
         />
@@ -407,6 +408,7 @@ function Home({
   ledgerAvailable,
   onOpenGroups,
   onOpenDirect,
+  onOpenNotifications,
   syncStatus,
   onSignOut
 }: {
@@ -414,6 +416,7 @@ function Home({
   ledgerAvailable: boolean;
   onOpenGroups: () => void;
   onOpenDirect: () => void;
+  onOpenNotifications: () => void;
   syncStatus: string | null;
   onSignOut: () => void;
 }) {
@@ -438,6 +441,9 @@ function Home({
       </Pressable>
       <Pressable accessibilityRole="button" onPress={onOpenDirect} style={styles.quiet}>
         <Text style={styles.quietLabel}>Direct expense</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={onOpenNotifications} style={styles.quiet}>
+        <Text style={styles.quietLabel}>Notifications</Text>
       </Pressable>
       <Text style={styles.body}>
         Groups, one-off Direct Expenses, and recurring Series are available.

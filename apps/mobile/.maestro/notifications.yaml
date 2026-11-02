@@ -1,0 +1,22 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "Notifications"
+- extendedWaitUntil:
+    visible: "Push preferences"
+    timeout: 10000
+- assertVisible: "Expense and correction push"
+- assertVisible: "Settlement push"
+- assertVisible: "dev_devdevice012345678901.*"
+- takeScreenshot: android-notification-preferences
+- tapOn: "Delete notification data"
+- extendedWaitUntil:
+    visible: ".*No device is registered.*"
+    timeout: 10000
+- takeScreenshot: android-notification-deleted

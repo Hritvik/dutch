@@ -40,6 +40,8 @@ let seriesById = new Map();
 let occurrencesBySeries = new Map();
 let firstSync = true;
 let lostSettlementResponse = false;
+let notificationDevices = new Map();
+let notificationPreferences = new Map();
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -161,6 +163,8 @@ const server = createServer(async (request, response) => {
     occurrencesBySeries = new Map();
     firstSync = true;
     lostSettlementResponse = false;
+    notificationDevices = new Map();
+    notificationPreferences = new Map();
     response.writeHead(204).end();
     return;
   }
@@ -193,6 +197,55 @@ const server = createServer(async (request, response) => {
   }
   const url = new URL(request.url, 'http://localhost');
   const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'notifications') {
+    const member = memberFor(subjectFrom(request));
+    if (parts[3] === 'devices' && request.method === 'POST' && parts.length === 4) {
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      notificationDevices.set(payload.deviceId, {
+        deviceId: payload.deviceId,
+        platform: payload.platform,
+        active: true
+      });
+      if (!notificationPreferences.has(member)) {
+        notificationPreferences.set(member, { activityPush: true, settlementPush: true });
+      }
+      json(response, 200, { data: notificationDevices.get(payload.deviceId) });
+      return;
+    }
+    if (parts[3] === 'devices' && request.method === 'GET' && parts.length === 4) {
+      json(response, 200, { data: [...notificationDevices.values()] });
+      return;
+    }
+    if (parts[3] === 'devices' && request.method === 'DELETE' && parts[4]) {
+      const device = notificationDevices.get(parts[4]);
+      if (device) device.active = false;
+      response.writeHead(204).end();
+      return;
+    }
+    if (parts[3] === 'preferences' && request.method === 'GET') {
+      const prefs = notificationPreferences.get(member)
+        ?? { activityPush: true, settlementPush: true };
+      notificationPreferences.set(member, prefs);
+      json(response, 200, { data: prefs });
+      return;
+    }
+    if (parts[3] === 'preferences' && request.method === 'PUT') {
+      const payload = JSON.parse((await readBody(request)) || '{}');
+      const prefs = notificationPreferences.get(member)
+        ?? { activityPush: true, settlementPush: true };
+      if (typeof payload.activityPush === 'boolean') prefs.activityPush = payload.activityPush;
+      if (typeof payload.settlementPush === 'boolean') prefs.settlementPush = payload.settlementPush;
+      notificationPreferences.set(member, prefs);
+      json(response, 200, { data: prefs });
+      return;
+    }
+    if (parts[3] === 'privacy' && request.method === 'DELETE') {
+      notificationDevices.clear();
+      notificationPreferences.delete(member);
+      response.writeHead(204).end();
+      return;
+    }
+  }
   if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'ledger') {
     if (request.method === 'POST' && parts[3] === 'sync-snapshots' && parts.length === 4) {
 

@@ -14,12 +14,7 @@ test("each service has contiguous, unique Flyway versions", async () => {
   for (const service of ["iam", "ums", "ledger", "notification"]) {
     const directory = path.join(repositoryRoot, "services", service,
       "src/main/resources/db/migration");
-    let files;
-    try {
-      files = await readdir(directory);
-    } catch {
-      continue;
-    }
+    const files = await readdir(directory);
     const versions = files
       .map((file) => /^V(\d+)__.+\.sql$/.exec(file))
       .filter(Boolean)

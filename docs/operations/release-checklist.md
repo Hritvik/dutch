@@ -3,8 +3,9 @@
 ## Record
 
 - Generate `infrastructure/provenance/release-record.json` with
-  `node tools/release-record.mjs` inputs from CI: artifact digest, source revision,
-  built-at instant, and workflow run URL.
+  `node tools/release-record.mjs build <artifactDigest> <sourceRevision> <out.json>
+  [workflowRunUrl]`, then validate it with
+  `node tools/release-record.mjs validate <out.json>`.
 - Validate it: `node tools/release-record.mjs validate <record.json>`.
 - Approver, rollback owner, and forward-repair owner must be named in the release
   ticket.

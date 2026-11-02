@@ -175,7 +175,8 @@ test('validates the S5 Direct Expense, Series, occurrence, and sync fixtures', a
     ['DirectExpenseResponse', 'direct-expense-response.json'],
     ['SeriesResponse', 'series-response-direct.json'],
     ['OccurrenceResponse', 'occurrence-response.json'],
-    ['SyncPageResponse', 'sync-page-response.json']
+    ['SyncPageResponse', 'sync-page-response.json'],
+    ['SyncSnapshotPageResponse', 'sync-snapshot-page.json']
   ];
   for (const [schema, file] of cases) {
     const fixture = JSON.parse(await readFile(

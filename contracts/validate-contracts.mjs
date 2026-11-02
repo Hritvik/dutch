@@ -168,7 +168,8 @@ const httpFixtures = [
   ['ledger-create-expense-percentage', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-percentage.json', 'http/ledger/openapi.yaml'],
   ['ledger-idempotency-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-idempotency-conflict.json', 'http/ledger/openapi.yaml'],
   ['notification-device', 'DeviceResponse', 'http/fixtures/notification/device.json', 'http/notification/openapi.yaml'],
-  ['notification-devices', 'DeviceListResponse', 'http/fixtures/notification/devices.json', 'http/notification/openapi.yaml']
+  ['notification-devices', 'DeviceListResponse', 'http/fixtures/notification/devices.json', 'http/notification/openapi.yaml'],
+  ['ledger-sync-snapshot-page', 'SyncSnapshotPageResponse', 'http/fixtures/ledger/sync-snapshot-page.json', 'http/ledger/openapi.yaml']
 ];
 
 export async function validateContracts(contractsRoot, overrides = {}) {

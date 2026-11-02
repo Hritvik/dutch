@@ -133,5 +133,30 @@ class RestoreRehearsalIntegrationTest {
         assertThat(restoredJdbc.queryForObject(
                 "SELECT balance_minor_units FROM member_balance_projection WHERE stream_id = ? AND member_id = ?",
                 Long.class, "group:" + GROUP.value() + ":INR", A.value())).isEqualTo(50L);
+
+        // Negative control: the drift query must detect a corrupted projection.
+        restoredJdbc.update("""
+                UPDATE member_balance_projection SET balance_minor_units = 999
+                WHERE stream_id = ? AND member_id = ?
+                """, "group:" + GROUP.value() + ":INR", A.value());
+        assertThat(restoredJdbc.queryForObject("""
+                WITH expected AS (
+                    SELECT stream_id, member_id, SUM(amount) AS balance FROM (
+                        SELECT stream_id, creditor_member_id AS member_id, minor_units AS amount
+                        FROM obligation_entry
+                        UNION ALL
+                        SELECT stream_id, debtor_member_id, -minor_units FROM obligation_entry
+                    ) entries GROUP BY stream_id, member_id
+                ), actual AS (
+                    SELECT stream_id, member_id, balance_minor_units FROM member_balance_projection
+                )
+                SELECT count(*) FROM (
+                    SELECT * FROM expected EXCEPT SELECT * FROM actual
+                    UNION ALL
+                    SELECT * FROM actual EXCEPT SELECT * FROM expected
+                ) diff
+                """, Long.class)).isPositive();
+
+        Files.deleteIfExists(dump);
     }
 }

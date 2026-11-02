@@ -246,6 +246,7 @@ export default function GroupDetailScreen() {
             placeholderTextColor={MUTED}
             style={styles.input}
             testID="invite-member"
+            accessibilityLabel="Member ID to invite"
             value={inviteId}
           />
           <Pressable

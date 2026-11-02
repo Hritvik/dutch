@@ -18,8 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Fixed-window per-identity (JWT sub) or per-IP request budget. Authentication
- * still runs independently; this only sheds abuse before the owning service.
+ * Fixed-window per-client-IP request budget, running before authentication so an
+ * unauthenticated flood does not reach JWT verification.
  */
 public final class GatewayRateLimitFilter extends OncePerRequestFilter {
 

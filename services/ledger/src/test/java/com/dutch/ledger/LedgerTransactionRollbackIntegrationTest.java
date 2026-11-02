@@ -30,7 +30,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** A failed journal/outbox append must roll back the source and projection together. */
+/** A failure after the journal append must roll back the source, entries, projection, and journal. */
 @Testcontainers(disabledWithoutDocker = true)
 class LedgerTransactionRollbackIntegrationTest {
 

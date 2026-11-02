@@ -91,7 +91,7 @@ async function fullSync(
     let cursor = '';
     let snapshotCursor: number | null = null;
     let complete = false;
-    for (let page = 0; page < 20; page++) {
+    for (let page = 0; page < 100; page++) {
       const snapshotPage = await readSyncSnapshot(baseUrl, accessToken, snapshot.token,
         fetchImpl, snapshotCursor, 200);
       collected.push(...snapshotPage.changes);

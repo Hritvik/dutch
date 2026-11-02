@@ -80,7 +80,18 @@ paths:
       description: Forwarded to the Notification service; device semantics live there.
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationIdHeader'
       responses:
+        '200':
+          description: The owning service response is proxied unchanged.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError' 
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -92,7 +103,18 @@ paths:
       description: Forwarded to the Notification service; device semantics live there.
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationIdHeader'
       responses:
+        '200':
+          description: The owning service response is proxied unchanged.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError' 
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -105,7 +127,18 @@ paths:
       description: Forwarded to the Ledger privacy export.
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationIdHeader'
       responses:
+        '200':
+          description: The owning service response is proxied unchanged.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError' 
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -118,7 +151,18 @@ paths:
       description: Forwarded to the Ledger safety-report intake.
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationIdHeader'
       responses:
+        '200':
+          description: The owning service response is proxied unchanged.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError' 
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':

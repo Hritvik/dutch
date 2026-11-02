@@ -49,16 +49,31 @@ public class OutboxRelay {
         this.maxAttempts = maxAttempts;
         this.meters = meters;
         Gauge.builder("outbox.unpublished", jdbc, source -> {
-            Long count = source.queryForObject(
-                    "SELECT count(*) FROM outbox_event WHERE published_at IS NULL", Long.class);
-            return count == null ? 0 : count;
+            try {
+                Long count = source.queryForObject("""
+                        SELECT count(*) FROM outbox_event o
+                        WHERE o.published_at IS NULL
+                          AND NOT EXISTS (SELECT 1 FROM outbox_dead_letter d
+                                          WHERE d.event_id = o.event_id)
+                        """, Long.class);
+                return count == null ? 0 : count;
+            } catch (RuntimeException unavailable) {
+                return 0;
+            }
         }).register(meters);
         Gauge.builder("outbox.oldest_unpublished_seconds", jdbc, source -> {
-            Double age = source.queryForObject("""
-                    SELECT COALESCE(EXTRACT(EPOCH FROM now() - min(occurred_at)), 0)
-                    FROM outbox_event WHERE published_at IS NULL
-                    """, Double.class);
-            return age == null ? 0 : age;
+            try {
+                Double age = source.queryForObject("""
+                        SELECT COALESCE(EXTRACT(EPOCH FROM now() - min(o.occurred_at)), 0)
+                        FROM outbox_event o
+                        WHERE o.published_at IS NULL
+                          AND NOT EXISTS (SELECT 1 FROM outbox_dead_letter d
+                                          WHERE d.event_id = o.event_id)
+                        """, Double.class);
+                return age == null ? 0 : age;
+            } catch (RuntimeException unavailable) {
+                return 0;
+            }
         }).register(meters);
     }
 

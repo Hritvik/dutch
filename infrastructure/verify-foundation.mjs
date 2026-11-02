@@ -92,6 +92,8 @@ export function inspectFoundation(repositoryRoot) {
     "npm ci",
     " validate",
     "scan-secrets.mjs",
+    "check-accessibility.mjs",
+    "release-record.mjs",
   ]) {
     if (!workflow.includes(expected)) issues.push(`quality workflow lacks ${expected}`);
   }

@@ -2,6 +2,7 @@ package com.dutch.ledger;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -27,6 +28,12 @@ class LedgerApplicationTest {
 
     @MockBean
     private JwtDecoder jwtDecoder;
+
+    @Test
+    void exposesThePrometheusScrapeEndpointWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
 
     @Test
     void exposesItsOwnHealthEndpoint() throws Exception {

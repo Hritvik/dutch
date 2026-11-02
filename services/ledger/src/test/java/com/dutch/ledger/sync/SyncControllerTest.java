@@ -184,6 +184,7 @@ class SyncControllerTest {
 
         java.util.List<String> seen = new java.util.ArrayList<>();
         Integer cursor = null;
+        int pages = 0;
         for (int page = 0; page < 20; page++) {
             var request = get("/api/v1/ledger/sync-snapshots/" + token)
                     .param("limit", "2").with(as(SYNC_SUBJECT));
@@ -193,17 +194,27 @@ class SyncControllerTest {
             String body = mockMvc.perform(request)
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
-            seen.addAll(JsonPath.read(body, "$.data.changes[*].resourceId"));
+            pages++;
+            var pageIds = JsonPath.<java.util.List<String>>read(
+                    body, "$.data.changes[*].resourceId");
+            org.assertj.core.api.Assertions.assertThat(pageIds).hasSizeLessThanOrEqualTo(2);
+            seen.addAll(pageIds);
             Boolean truncated = JsonPath.read(body, "$.data.truncated");
+            if (page == 0) {
+                org.assertj.core.api.Assertions.assertThat(truncated).isTrue();
+                org.assertj.core.api.Assertions.assertThat(
+                        (Object) JsonPath.read(body, "$.data.nextSnapshotCursor")).isNotNull();
+            }
             if (!truncated) {
                 break;
             }
             cursor = JsonPath.read(body, "$.data.nextSnapshotCursor");
         }
 
-        org.assertj.core.api.Assertions.assertThat(seen)
-                .contains("grp_112345678901234567", "grp_212345678901234567",
-                        "grp_312345678901234567");
+        org.assertj.core.api.Assertions.assertThat(pages).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(seen).containsExactlyInAnyOrder(
+                "grp_112345678901234567", "grp_212345678901234567",
+                "grp_312345678901234567");
     }
 
     @Test

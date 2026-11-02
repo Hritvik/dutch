@@ -46,5 +46,12 @@ class JdbcSafetyReportIntegrationTest {
 
         assertThat(replay.get("reportId")).isEqualTo(first.get("reportId"));
         assertThat(different.get("reportId")).isNotEqualTo(first.get("reportId"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> reports.report(
+                        "aps_admin_0123456789012345678901",
+                        new SafetyReportService.CreateReportRequest(
+                                "SPAM", "GROUP", "grp_012345678901234567", "Changed details"),
+                        "report-key-1"))
+                .isInstanceOf(com.dutch.ledger.expense.IdempotencyConflictException.class);
     }
 }

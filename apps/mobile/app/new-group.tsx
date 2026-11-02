@@ -65,6 +65,7 @@ export default function NewGroupScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="group-name"
+        accessibilityLabel="Group name"
         value={name}
       />
 
@@ -75,6 +76,7 @@ export default function NewGroupScreen() {
         onChangeText={(value) => setCurrency(value.toUpperCase())}
         style={styles.input}
         testID="group-currency"
+        accessibilityLabel="Currency"
         value={currency}
       />
 

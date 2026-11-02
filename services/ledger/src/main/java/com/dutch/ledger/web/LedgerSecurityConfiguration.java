@@ -32,7 +32,7 @@ public class LedgerSecurityConfiguration {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
                         .requestMatchers("/api/v1/groups/**").authenticated()
                         .requestMatchers("/api/v1/direct-expenses/**").authenticated()
                         .requestMatchers("/api/v1/series/**").authenticated()

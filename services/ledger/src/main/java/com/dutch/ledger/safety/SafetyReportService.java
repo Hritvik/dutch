@@ -46,38 +46,60 @@ public class SafetyReportService {
                 && (idempotencyKey.isBlank() || idempotencyKey.length() > 200)) {
             throw new IllegalArgumentException("Idempotency-Key is invalid");
         }
+        String requestHash = hash(category + "|" + scopeType + "|"
+                + (request.scopeId() == null ? "" : request.scopeId()) + "|" + request.details());
         if (idempotencyKey != null) {
             var existing = jdbc.query("""
-                    SELECT report_id, status FROM safety_report
+                    SELECT report_id, status, request_hash FROM safety_report
                     WHERE reporter_member_id = ? AND idempotency_key = ?
-                    """, (result, index) -> Map.<String, Object>of(
-                    "reportId", result.getString("report_id"),
-                    "status", result.getString("status")), reporter, idempotencyKey);
+                    """, (result, index) -> new Object[]{
+                    result.getString("report_id"), result.getString("status"),
+                    result.getString("request_hash")}, reporter, idempotencyKey);
             if (!existing.isEmpty()) {
-                return existing.get(0);
+                if (!requestHash.equals(existing.get(0)[2])) {
+                    throw new com.dutch.ledger.expense.IdempotencyConflictException();
+                }
+                return Map.of("reportId", existing.get(0)[0], "status", existing.get(0)[1]);
             }
         }
         String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "");
         jdbc.update("""
                 INSERT INTO safety_report
                     (report_id, reporter_member_id, category, scope_type, scope_id, details,
-                     idempotency_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                     idempotency_key, request_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (reporter_member_id, idempotency_key) DO NOTHING
                 """, reportId, reporter, category, scopeType, request.scopeId(),
-                request.details(), idempotencyKey);
+                request.details(), idempotencyKey, requestHash);
         if (idempotencyKey != null) {
             var raced = jdbc.query("""
-                    SELECT report_id, status FROM safety_report
+                    SELECT report_id, status, request_hash FROM safety_report
                     WHERE reporter_member_id = ? AND idempotency_key = ?
-                    """, (result, index) -> Map.<String, Object>of(
-                    "reportId", result.getString("report_id"),
-                    "status", result.getString("status")), reporter, idempotencyKey);
+                    """, (result, index) -> new Object[]{
+                    result.getString("report_id"), result.getString("status"),
+                    result.getString("request_hash")}, reporter, idempotencyKey);
             if (!raced.isEmpty()) {
-                return raced.get(0);
+                if (!requestHash.equals(raced.get(0)[2])) {
+                    throw new com.dutch.ledger.expense.IdempotencyConflictException();
+                }
+                return Map.of("reportId", raced.get(0)[0], "status", raced.get(0)[1]);
             }
         }
         return Map.of("reportId", reportId, "status", "RECEIVED");
+    }
+
+    private static String hash(String canonical) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(String.format("%02x", value));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     public record CreateReportRequest(String category, String scopeType, String scopeId,

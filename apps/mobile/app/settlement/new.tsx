@@ -351,6 +351,7 @@ export default function NewSettlementScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="settlement-amount"
+        accessibilityLabel="Settlement amount"
         value={amount}
       />
 

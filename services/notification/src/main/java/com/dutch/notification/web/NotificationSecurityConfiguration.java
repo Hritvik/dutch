@@ -24,7 +24,7 @@ public class NotificationSecurityConfiguration {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health/**", "/internal/**").permitAll()
+                        .requestMatchers("/actuator/health/**", "/actuator/prometheus", "/internal/**").permitAll()
                         .requestMatchers("/api/v1/notifications/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))

@@ -38,7 +38,7 @@ public class DeliveryRetrySweep {
                 FROM notification_delivery d
                 JOIN notification_device dev ON dev.device_id = d.device_id AND dev.active
                 WHERE (d.status = 'FAILED' OR (d.status = 'QUEUED' AND d.created_at < now() - interval '2 minutes'))
-                  AND d.attempts < ?
+                  AND d.receipted_at IS NULL AND d.attempts < ?
                 ORDER BY d.created_at
                 LIMIT ?
                 """, (result, index) -> new Retry(

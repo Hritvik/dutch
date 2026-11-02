@@ -25,6 +25,7 @@ class JdbcSyncJournalIntegrationTest {
     private static final MemberId B = new MemberId("mem_112345678901234567");
     private static final MemberId C = new MemberId("mem_212345678901234567");
     private static final MemberId D = new MemberId("mem_312345678901234567");
+    private static final MemberId E = new MemberId("mem_412345678901234567");
     private static final Instant NOW = Instant.parse("2026-11-02T00:00:00Z");
 
     @Container
@@ -63,6 +64,32 @@ class JdbcSyncJournalIntegrationTest {
         assertThat(journal.after(B, 0, 10)).hasSize(1);
         assertThat(journal.after(A, 1, 10)).hasSize(1);
         assertThat(journal.maxSequence(A)).isEqualTo(2);
+    }
+
+    @Test
+    void pages_a_snapshot_by_sequence_without_dropping_or_duplicating_rows() {
+        transactions.executeWithoutResult(status -> {
+            journal.append(List.of(E), "GROUP", "grp_112345678901234567", "upsert", 1,
+                    Map.of("name", "One"), null, NOW);
+            journal.append(List.of(E), "GROUP", "grp_212345678901234567", "upsert", 1,
+                    Map.of("name", "Two"), null, NOW.plusSeconds(1));
+            journal.append(List.of(E), "GROUP", "grp_312345678901234567", "upsert", 1,
+                    Map.of("name", "Three"), null, NOW.plusSeconds(2));
+        });
+        long asOf = journal.maxSequence(E);
+        var first = journal.snapshot(E, asOf, 0, 2);
+        assertThat(first).hasSize(2);
+        var second = journal.snapshot(E, asOf, first.get(first.size() - 1).sequence(), 2);
+        assertThat(second).hasSize(1);
+        assertThat(java.util.stream.Stream.concat(first.stream(), second.stream())
+                .map(com.dutch.ledger.sync.SyncChange::resourceId).distinct().count()).isEqualTo(3);
+
+        transactions.executeWithoutResult(status -> journal.append(List.of(E), "GROUP",
+                "grp_212345678901234567", "tombstone", 2, Map.of(), null, NOW.plusSeconds(3)));
+        long tombstoneAsOf = journal.maxSequence(E);
+        var withoutTombstone = journal.snapshot(E, tombstoneAsOf, 0, 10);
+        assertThat(withoutTombstone).extracting(com.dutch.ledger.sync.SyncChange::resourceId)
+                .containsExactly("grp_112345678901234567", "grp_312345678901234567");
     }
 
     @Test

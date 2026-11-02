@@ -57,6 +57,7 @@ class NotificationIntegrationTest {
         registry.add("spring.datasource.username", database::getUsername);
         registry.add("spring.datasource.password", database::getPassword);
         registry.add("dutch.notification.service-token", () -> "test-service-token");
+        registry.add("dutch.notification.receipt-token", () -> "test-receipt-token");
     }
 
     @Autowired
@@ -227,7 +228,7 @@ class NotificationIntegrationTest {
                 """, ADMIN, DEVICE, UUID.randomUUID());
 
         mockMvc.perform(post("/internal/receipts")
-                        .header("X-Service-Token", "test-service-token")
+                        .header("X-Service-Token", "test-receipt-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"deliveryId":"not_112345678901234567","status":"DELIVERED",
@@ -239,7 +240,7 @@ class NotificationIntegrationTest {
                 """, String.class, "not_112345678901234567")).isEqualTo("SENT");
 
         mockMvc.perform(post("/internal/receipts")
-                        .header("X-Service-Token", "test-service-token")
+                        .header("X-Service-Token", "test-receipt-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"deliveryId":"not_112345678901234567","status":"FAILED"}
@@ -247,7 +248,7 @@ class NotificationIntegrationTest {
                 .andExpect(status().isNoContent());
         assertThat(jdbc.queryForObject("""
                 SELECT status FROM notification_delivery WHERE delivery_id = ?
-                """, String.class, "not_112345678901234567")).isEqualTo("FAILED");
+                """, String.class, "not_112345678901234567")).isEqualTo("SENT");
     }
 
     @Test

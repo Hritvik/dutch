@@ -39,8 +39,14 @@ public class SyncController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String token,
             @RequestParam(name = "cursor", required = false) String cursor,
-            @RequestParam(name = "limit", defaultValue = "200") int limit) {
+            @RequestParam(name = "limit", defaultValue = "200") String limit) {
+        int parsed;
+        try {
+            parsed = Integer.parseInt(limit);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("limit must be between 1 and 500");
+        }
         return ResponseEntity.ok(Map.of("data",
-                sync.readSnapshot(jwt.getSubject(), token, cursor, limit)));
+                sync.readSnapshot(jwt.getSubject(), token, cursor, parsed)));
     }
 }

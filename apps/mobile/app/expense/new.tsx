@@ -350,6 +350,7 @@ export default function NewExpenseScreen() {
                 placeholderTextColor={MUTED}
                 style={styles.input}
                 testID="correction-amount"
+        accessibilityLabel="Correction amount"
                 value={correctionAmount}
               />
               {correctionError ? <Text style={styles.notice}>{correctionError}</Text> : null}
@@ -399,6 +400,7 @@ export default function NewExpenseScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="expense-description"
+        accessibilityLabel="Expense description"
         value={description}
       />
 
@@ -414,6 +416,7 @@ export default function NewExpenseScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="expense-amount"
+        accessibilityLabel="Expense amount"
         value={amount}
       />
 

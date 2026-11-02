@@ -179,6 +179,7 @@ export default function NewDirectExpenseScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="direct-description"
+        accessibilityLabel="Direct expense description"
         value={description}
       />
 
@@ -193,6 +194,7 @@ export default function NewDirectExpenseScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="direct-amount"
+        accessibilityLabel="Direct expense amount"
         value={amount}
       />
 

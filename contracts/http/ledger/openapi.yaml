@@ -1105,7 +1105,7 @@ components:
                 - A group must retain at least one active Admin.
                 - The idempotency key was reused with a different request.
                 - The sync cursor expired. Request a full snapshot.
-                - Too many requests. Retry later.
+                - Request rate limit exceeded
                 - Service is temporarily unavailable
             correlationId:
               type: string
@@ -2020,6 +2020,8 @@ components:
           type: string
           enum:
             - RECEIVED
+            - TRIAGED
+            - CLOSED
     ReportResponse:
       type: object
       additionalProperties: false

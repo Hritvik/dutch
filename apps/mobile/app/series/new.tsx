@@ -125,6 +125,7 @@ export default function NewSeriesScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="series-description"
+        accessibilityLabel="Series description"
         value={description}
       />
 
@@ -139,6 +140,7 @@ export default function NewSeriesScreen() {
         placeholderTextColor={MUTED}
         style={styles.input}
         testID="series-amount"
+        accessibilityLabel="Series amount"
         value={amount}
       />
 
@@ -173,6 +175,7 @@ export default function NewSeriesScreen() {
         }}
         style={styles.input}
         testID="series-due-day"
+        accessibilityLabel="Due day"
         value={dueDay}
       />
 

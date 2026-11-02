@@ -24,10 +24,15 @@ public class InternalReceiptController {
     private final MeterRegistry meters;
     private final String serviceToken;
 
-    public InternalReceiptController(JdbcTemplate jdbc, MeterRegistry meters,
-                                     @Value("${dutch.notification.service-token:}") String serviceToken) {
+    public InternalReceiptController(
+            JdbcTemplate jdbc, MeterRegistry meters,
+            @Value("${dutch.notification.receipt-token:}") String serviceToken) {
         this.jdbc = jdbc;
         this.meters = meters;
+        if (serviceToken == null || serviceToken.isBlank()) {
+            org.slf4j.LoggerFactory.getLogger(InternalReceiptController.class).warn(
+                    "DUTCH_NOTIFICATION_RECEIPT_TOKEN is unset; this instance accepts no receipts");
+        }
         this.serviceToken = serviceToken == null || serviceToken.isBlank()
                 ? UUID.randomUUID().toString() : serviceToken;
     }
@@ -51,19 +56,31 @@ public class InternalReceiptController {
             updated = jdbc.update("""
                     UPDATE notification_delivery
                     SET status = 'SENT', provider_message_id = ?, receipted_at = ?
-                    WHERE delivery_id = ?
+                    WHERE delivery_id = ? AND status <> 'SENT'
                     """, request.providerMessageId(), Timestamp.from(Instant.now()),
                     request.deliveryId());
-            if (updated > 0) meters.counter("notification.receipts", "status", "delivered").increment();
+            if (updated > 0) {
+                meters.counter("notification.receipts", "status", "delivered").increment();
+            }
         } else {
             updated = jdbc.update("""
                     UPDATE notification_delivery
                     SET status = 'FAILED', attempts = attempts + 1, receipted_at = ?
-                    WHERE delivery_id = ?
+                    WHERE delivery_id = ? AND status NOT IN ('SENT', 'FAILED')
                     """, Timestamp.from(Instant.now()), request.deliveryId());
-            if (updated > 0) meters.counter("notification.receipts", "status", "failed").increment();
+            if (updated > 0) {
+                meters.counter("notification.receipts", "status", "failed").increment();
+            }
         }
-        return updated == 0 ? ResponseEntity.notFound().build() : ResponseEntity.noContent().build();
+        if (updated > 0) {
+            return ResponseEntity.noContent().build();
+        }
+        Integer exists = jdbc.queryForObject(
+                "SELECT count(*) FROM notification_delivery WHERE delivery_id = ?",
+                Integer.class, request.deliveryId());
+        return exists != null && exists > 0
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
     }
 
     public record ReceiptRequest(String deliveryId, String status, String providerMessageId) {

@@ -40,6 +40,12 @@ class NotificationApplicationTest {
     private JwtDecoder jwtDecoder;
 
     @Test
+    void exposesThePrometheusScrapeEndpointWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void exposesItsOwnHealthEndpoint() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())

@@ -18,11 +18,19 @@ set +a
 compose=(docker compose --env-file .env -f compose.yaml)
 stamp="$(date +%s)"
 workdir="$(mktemp -d)"
-trap 'rm -rf "$workdir"' EXIT
+superuser="${DUTCH_LOCAL_POSTGRES_USER:-dutch_local_admin}"
+created=()
+cleanup() {
+  for database in "${created[@]:-}"; do
+    psql -d postgres -c "DROP DATABASE IF EXISTS \"${database}\"" >/dev/null 2>&1 || true
+  done
+  rm -rf "$workdir"
+}
+trap cleanup EXIT
 services=(iam ums ledger notification)
 
 psql() {
-  "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" "$@"
+  "${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$superuser" "$@"
 }
 
 for service in "${services[@]}"; do
@@ -31,12 +39,13 @@ for service in "${services[@]}"; do
   dump="$workdir/${service}.dump"
 
   echo "==> ${service}: dump"
-  "${compose[@]}" exec -T postgres pg_dump -Fc -U "$POSTGRES_USER" "$database" > "$dump"
+  "${compose[@]}" exec -T postgres pg_dump -Fc -U "$superuser" "$database" > "$dump"
   before="$(psql -d "$database" -Atc "SELECT count(*) FROM flyway_schema_history WHERE success")"
 
   echo "==> ${service}: restore into ${restored}"
   psql -d postgres -c "CREATE DATABASE \"${restored}\""
-  "${compose[@]}" exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$restored" < "$dump"
+  created+=("$restored")
+  "${compose[@]}" exec -T postgres pg_restore -U "$superuser" -d "$restored" < "$dump"
   after="$(psql -d "$restored" -Atc "SELECT count(*) FROM flyway_schema_history WHERE success")"
   if [[ "$before" != "$after" || "$after" -eq 0 ]]; then
     echo "${service}: migration history mismatch (${before} -> ${after})" >&2
@@ -79,7 +88,6 @@ for service in "${services[@]}"; do
     echo "ledger: entries=${entries_after} outbox=${outbox_after} projection-drift=0"
   fi
 
-  psql -d postgres -c "DROP DATABASE \"${restored}\""
   echo "==> ${service}: rehearsal passed"
 done
 

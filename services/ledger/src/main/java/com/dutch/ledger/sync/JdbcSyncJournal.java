@@ -78,10 +78,10 @@ public class JdbcSyncJournal implements SyncJournal {
                         sequence, resource_type, resource_id, operation, resource_version,
                         payload, action_id, schema_version, occurred_at
                     FROM member_sync_change
-                    WHERE member_id = ? AND sequence <= ?
+                    WHERE member_id = ? AND sequence <= ? AND sequence > ?
                     ORDER BY resource_type, resource_id, sequence DESC
                 ) latest
-                WHERE operation <> 'tombstone' AND sequence > ?
+                WHERE operation <> 'tombstone'
                 ORDER BY sequence
                 LIMIT ?
                 """, (result, index) -> change(result), recipient.value(), asOfSequence,

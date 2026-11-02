@@ -218,6 +218,39 @@ class NotificationIntegrationTest {
     }
 
     @Test
+    void a_provider_receipt_marks_the_delivery_delivered_or_failed() throws Exception {
+        registerDevice(ADMIN_SUBJECT, DEVICE);
+        jdbc.update("""
+                INSERT INTO notification_delivery
+                    (delivery_id, member_id, device_id, event_id, category, status)
+                VALUES ('not_112345678901234567', ?, ?, ?, 'EXPENSE', 'QUEUED')
+                """, ADMIN, DEVICE, UUID.randomUUID());
+
+        mockMvc.perform(post("/internal/receipts")
+                        .header("X-Service-Token", "test-service-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"deliveryId":"not_112345678901234567","status":"DELIVERED",
+                                 "providerMessageId":"provider-1"}
+                                """))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM notification_delivery WHERE delivery_id = ?
+                """, String.class, "not_112345678901234567")).isEqualTo("SENT");
+
+        mockMvc.perform(post("/internal/receipts")
+                        .header("X-Service-Token", "test-service-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"deliveryId":"not_112345678901234567","status":"FAILED"}
+                                """))
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("""
+                SELECT status FROM notification_delivery WHERE delivery_id = ?
+                """, String.class, "not_112345678901234567")).isEqualTo("FAILED");
+    }
+
+    @Test
     void an_internal_event_requires_the_service_token() throws Exception {
         mockMvc.perform(post("/internal/events")
                         .header("X-Service-Token", "wrong")

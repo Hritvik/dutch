@@ -7,6 +7,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,9 +33,12 @@ public class OutboxRelay {
     private final OutboxTransport transport;
     private final int batchSize;
     private final int maxAttempts;
+    private final MeterRegistry meters;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public OutboxRelay(JdbcTemplate jdbc, ObjectMapper objectMapper,
                        TransactionTemplate transactions, OutboxTransport transport,
+                       MeterRegistry meters,
                        @Value("${dutch.outbox.batch-size:20}") int batchSize,
                        @Value("${dutch.outbox.max-attempts:5}") int maxAttempts) {
         this.jdbc = jdbc;
@@ -42,6 +47,27 @@ public class OutboxRelay {
         this.transport = transport;
         this.batchSize = batchSize;
         this.maxAttempts = maxAttempts;
+        this.meters = meters;
+        Gauge.builder("outbox.unpublished", jdbc, source -> {
+            Long count = source.queryForObject(
+                    "SELECT count(*) FROM outbox_event WHERE published_at IS NULL", Long.class);
+            return count == null ? 0 : count;
+        }).register(meters);
+        Gauge.builder("outbox.oldest_unpublished_seconds", jdbc, source -> {
+            Double age = source.queryForObject("""
+                    SELECT COALESCE(EXTRACT(EPOCH FROM now() - min(occurred_at)), 0)
+                    FROM outbox_event WHERE published_at IS NULL
+                    """, Double.class);
+            return age == null ? 0 : age;
+        }).register(meters);
+    }
+
+    /** Test-only convenience without a registry. */
+    OutboxRelay(JdbcTemplate jdbc, ObjectMapper objectMapper, TransactionTemplate transactions,
+                OutboxTransport transport, int batchSize, int maxAttempts) {
+        this(jdbc, objectMapper, transactions, transport,
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry(),
+                batchSize, maxAttempts);
     }
 
     @Scheduled(fixedDelayString = "${dutch.outbox.relay-delay-ms:2000}")
@@ -63,9 +89,11 @@ public class OutboxRelay {
             try {
                 transport.send(event);
                 markPublished(event.eventId());
+                meters.counter("outbox.published", "event_type", event.eventType()).increment();
                 delivered++;
             } catch (RuntimeException failure) {
                 recordFailure(event.eventId(), failure);
+                meters.counter("outbox.retried", "event_type", event.eventType()).increment();
             }
         }
         return delivered;
@@ -134,6 +162,7 @@ public class OutboxRelay {
                     """, eventId, reason);
             // Leave published_at NULL so publish-lag alerts still see the event; the
             // claim query excludes dead-lettered rows.
+            meters.counter("outbox.dead_lettered").increment();
             LOG.error("outbox event {} moved to the dead-letter table", eventId);
         }
     }

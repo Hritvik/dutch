@@ -713,6 +713,15 @@ paths:
       operationId: createSafetyReport
       security:
         - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Reusing the key returns the original report receipt.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
       requestBody:
         required: true
         content:

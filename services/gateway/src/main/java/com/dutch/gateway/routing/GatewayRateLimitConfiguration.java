@@ -13,10 +13,11 @@ public class GatewayRateLimitConfiguration {
     @Bean
     FilterRegistrationBean<GatewayRateLimitFilter> rateLimitFilter(
             ObjectMapper objectMapper,
+            io.micrometer.core.instrument.MeterRegistry meters,
             @Value("${gateway.rate-limit.capacity:120}") int capacity,
             @Value("${gateway.rate-limit.window-seconds:60}") long windowSeconds) {
         FilterRegistrationBean<GatewayRateLimitFilter> registration = new FilterRegistrationBean<>(
-                new GatewayRateLimitFilter(capacity, windowSeconds, objectMapper));
+                new GatewayRateLimitFilter(capacity, windowSeconds, objectMapper, meters));
         // Shed before the security chain so unauthenticated floods do not reach JWT parsing.
         registration.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER - 1);
         registration.addUrlPatterns("/api/v1/*");

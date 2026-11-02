@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -20,10 +21,12 @@ public class NotificationDeliveryService {
 
     private final JdbcTemplate jdbc;
     private final PushSender push;
+    private final MeterRegistry meters;
 
-    public NotificationDeliveryService(JdbcTemplate jdbc, PushSender push) {
+    public NotificationDeliveryService(JdbcTemplate jdbc, PushSender push, MeterRegistry meters) {
         this.jdbc = jdbc;
         this.push = push;
+        this.meters = meters;
     }
 
     @Transactional
@@ -70,7 +73,9 @@ public class NotificationDeliveryService {
             }
             boolean enabled = preference(memberId, category);
             if (!enabled) {
-                insertDelivery(memberId, null, eventId, category, "SUPPRESSED");
+                if (insertDelivery(memberId, null, eventId, category, "SUPPRESSED") != null) {
+                    meters.counter("notification.deliveries", "status", "suppressed").increment();
+                }
                 continue;
             }
             List<Device> devices = jdbc.query("""
@@ -79,7 +84,9 @@ public class NotificationDeliveryService {
                     """, (result, index) -> new Device(
                     result.getString("device_id"), result.getString("push_token")), memberId);
             if (devices.isEmpty()) {
-                insertDelivery(memberId, null, eventId, category, "SKIPPED");
+                if (insertDelivery(memberId, null, eventId, category, "SKIPPED") != null) {
+                    meters.counter("notification.deliveries", "status", "skipped").increment();
+                }
                 continue;
             }
             String title = category.equals("SETTLEMENT") ? "Settlement recorded" : "Expense recorded";
@@ -88,6 +95,7 @@ public class NotificationDeliveryService {
                 String deliveryId = insertDelivery(memberId, device.deviceId(), eventId, category,
                         "QUEUED");
                 if (deliveryId != null) {
+                    meters.counter("notification.deliveries", "status", "queued").increment();
                     pending.add(new PendingDelivery(deliveryId, device.pushToken(), title, body));
                 }
             }
@@ -101,12 +109,14 @@ public class NotificationDeliveryService {
                 push.send(delivery.pushToken(), delivery.title(), delivery.body());
                 jdbc.update("UPDATE notification_delivery SET status = 'SENT' WHERE delivery_id = ?",
                         delivery.deliveryId());
+                meters.counter("notification.deliveries", "status", "sent").increment();
             } catch (RuntimeException failure) {
                 jdbc.update("""
                         UPDATE notification_delivery
                         SET status = 'FAILED', attempts = attempts + 1
                         WHERE delivery_id = ?
                         """, delivery.deliveryId());
+                meters.counter("notification.deliveries", "status", "failed").increment();
             }
         }
     }

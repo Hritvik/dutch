@@ -1,0 +1,39 @@
+# Prometheus alert rules for the Dutch services. Metric names follow the
+# Micrometer Prometheus registry (dots become underscores, counters end _total).
+groups:
+  - name: dutch-reliability
+    rules:
+      - alert: OutboxUnpublishedLag
+        expr: outbox_oldest_unpublished_seconds > 300 and outbox_unpublished > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Ledger outbox has unpublished events older than five minutes.
+          runbook: docs/operations/runbooks/outbox-notifications.md
+      - alert: OutboxDeadLetter
+        expr: increase(outbox_dead_lettered_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: A Ledger event reached the dead-letter table.
+          runbook: docs/operations/runbooks/outbox-notifications.md
+      - alert: NotificationDeliveryFailures
+        expr: increase(notification_deliveries_total{status="failed"}[10m]) > 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Notification pushes are failing repeatedly.
+          runbook: docs/operations/runbooks/outbox-notifications.md
+      - alert: GatewayRateLimitShare
+        expr: |
+          sum(rate(gateway_rate_limited_total[5m]))
+            / clamp_min(sum(rate(gateway_requests_total[5m])), 0.001) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 20% of gateway API requests are rate limited.
+          runbook: docs/operations/runbooks/outbox-notifications.md

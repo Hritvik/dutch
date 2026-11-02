@@ -11,6 +11,7 @@ const requiredFiles = [
   "apps/mobile/eas.json",
   "tools/release-record.mjs",
   "tools/check-accessibility.mjs",
+  "infrastructure/observability/dutch-alerts.yaml",
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "infrastructure/aws/modules/foundation/main.tf",
@@ -72,6 +73,14 @@ export function inspectFoundation(repositoryRoot) {
   );
   for (const expected of ["pg_dump", "pg_restore", "flyway_schema_history", "projection"]) {
     if (!rehearsal.includes(expected)) issues.push(`restore rehearsal lacks ${expected}`);
+  }
+  const alerts = fs.readFileSync(
+    path.join(repositoryRoot, "infrastructure/observability/dutch-alerts.yaml"),
+    "utf8",
+  );
+  for (const alert of ["OutboxUnpublishedLag", "OutboxDeadLetter",
+    "NotificationDeliveryFailures", "GatewayRateLimitShare"]) {
+    if (!alerts.includes(alert)) issues.push(`alert rules lack ${alert}`);
   }
   const eas = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "apps/mobile/eas.json"), "utf8"));
   for (const profile of ["development", "preview", "production"]) {

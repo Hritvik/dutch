@@ -20,7 +20,8 @@ public class SafetyReportService {
     }
 
     @Transactional
-    public Map<String, Object> report(String appSubject, CreateReportRequest request) {
+    public Map<String, Object> report(String appSubject, CreateReportRequest request,
+                                      String idempotencyKey) {
         String reporter = members.resolve(appSubject)
                 .orElseThrow(GroupAccessDeniedException::new).value();
         if (request == null || request.category() == null) {
@@ -41,12 +42,41 @@ public class SafetyReportService {
         if (request.scopeId() != null && request.scopeId().length() > 256) {
             throw new IllegalArgumentException("scopeId must be at most 256 characters");
         }
+        if (idempotencyKey != null
+                && (idempotencyKey.isBlank() || idempotencyKey.length() > 200)) {
+            throw new IllegalArgumentException("Idempotency-Key is invalid");
+        }
+        if (idempotencyKey != null) {
+            var existing = jdbc.query("""
+                    SELECT report_id, status FROM safety_report
+                    WHERE reporter_member_id = ? AND idempotency_key = ?
+                    """, (result, index) -> Map.<String, Object>of(
+                    "reportId", result.getString("report_id"),
+                    "status", result.getString("status")), reporter, idempotencyKey);
+            if (!existing.isEmpty()) {
+                return existing.get(0);
+            }
+        }
         String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "");
         jdbc.update("""
                 INSERT INTO safety_report
-                    (report_id, reporter_member_id, category, scope_type, scope_id, details)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, reportId, reporter, category, scopeType, request.scopeId(), request.details());
+                    (report_id, reporter_member_id, category, scope_type, scope_id, details,
+                     idempotency_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (reporter_member_id, idempotency_key) DO NOTHING
+                """, reportId, reporter, category, scopeType, request.scopeId(),
+                request.details(), idempotencyKey);
+        if (idempotencyKey != null) {
+            var raced = jdbc.query("""
+                    SELECT report_id, status FROM safety_report
+                    WHERE reporter_member_id = ? AND idempotency_key = ?
+                    """, (result, index) -> Map.<String, Object>of(
+                    "reportId", result.getString("report_id"),
+                    "status", result.getString("status")), reporter, idempotencyKey);
+            if (!raced.isEmpty()) {
+                return raced.get(0);
+            }
+        }
         return Map.of("reportId", reportId, "status", "RECEIVED");
     }
 

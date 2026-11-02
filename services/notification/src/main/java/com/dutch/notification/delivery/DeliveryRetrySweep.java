@@ -1,6 +1,7 @@
 package com.dutch.notification.delivery;
 
 import java.util.List;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,10 +15,12 @@ public class DeliveryRetrySweep {
 
     private final JdbcTemplate jdbc;
     private final PushSender push;
+    private final MeterRegistry meters;
 
-    public DeliveryRetrySweep(JdbcTemplate jdbc, PushSender push) {
+    public DeliveryRetrySweep(JdbcTemplate jdbc, PushSender push, MeterRegistry meters) {
         this.jdbc = jdbc;
         this.push = push;
+        this.meters = meters;
     }
 
     @Scheduled(fixedDelayString = "${dutch.notification.retry-delay-ms:60000}")
@@ -47,6 +50,7 @@ public class DeliveryRetrySweep {
                 push.send(retry.pushToken(), "Dutch", "Open Dutch to review the latest Activity.");
                 jdbc.update("UPDATE notification_delivery SET status = 'SENT' WHERE delivery_id = ?",
                         retry.deliveryId());
+                meters.counter("notification.deliveries", "status", "retried").increment();
                 sent++;
             } catch (RuntimeException failure) {
                 jdbc.update("""

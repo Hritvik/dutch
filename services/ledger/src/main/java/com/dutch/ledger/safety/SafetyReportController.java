@@ -20,8 +20,12 @@ public class SafetyReportController {
     }
 
     @PostMapping
-    ResponseEntity<Map<String, Object>> report(@AuthenticationPrincipal Jwt jwt,
-                                               @RequestBody SafetyReportService.CreateReportRequest request) {
-        return ResponseEntity.ok(Map.of("data", reports.report(jwt.getSubject(), request)));
+    ResponseEntity<Map<String, Object>> report(
+            @AuthenticationPrincipal Jwt jwt,
+            @org.springframework.web.bind.annotation.RequestHeader(
+                    value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody SafetyReportService.CreateReportRequest request) {
+        return ResponseEntity.ok(Map.of("data",
+                reports.report(jwt.getSubject(), request, idempotencyKey)));
     }
 }

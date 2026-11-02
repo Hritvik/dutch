@@ -34,6 +34,7 @@ export default function NewDirectExpenseScreen() {
   const key = useRef<string | null>(null);
   const occurredAt = useRef<string | null>(null);
   const draftLoaded = useRef(false);
+  const [draftHydrated, setDraftHydrated] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -63,17 +64,19 @@ export default function NewDirectExpenseScreen() {
       const draft = await loadDraft<{
         description: string; amount: string; otherId: string | null;
       }>(memberId, 'direct-expense');
-      if (!draft) return;
-      setDescription(draft.description);
-      setAmount(draft.amount);
-      if (draft.otherId) setOtherId(draft.otherId);
+      if (draft) {
+        setDescription(draft.description);
+        setAmount(draft.amount);
+        if (draft.otherId) setOtherId(draft.otherId);
+      }
+      setDraftHydrated(true);
     })();
   }, [memberId]);
 
   useEffect(() => {
-    if (!memberId || !draftLoaded.current) return;
+    if (!memberId || !draftHydrated) return;
     void saveDraft(memberId, 'direct-expense', { description, amount, otherId });
-  }, [amount, description, memberId, otherId]);
+  }, [amount, description, draftHydrated, memberId, otherId]);
 
   const others = Array.from(new Set(
     groups.flatMap((group) => group.memberships

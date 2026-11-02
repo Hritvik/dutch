@@ -414,6 +414,8 @@ paths:
           $ref: "#/components/responses/Invalid"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
   /api/v1/ledger/sync-snapshots:
@@ -430,6 +432,8 @@ paths:
                 $ref: "#/components/schemas/SyncSnapshotResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/v1/ledger/sync-snapshots/{token}:
     get:
       operationId: readSyncSnapshot
@@ -451,6 +455,8 @@ paths:
                 $ref: "#/components/schemas/SyncSnapshotPageResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
   /api/v1/series:

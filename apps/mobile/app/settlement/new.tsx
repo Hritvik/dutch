@@ -45,6 +45,7 @@ export default function NewSettlementScreen() {
   const occurredAt = useRef<string | null>(null);
   const voidKey = useRef<string | null>(null);
   const draftLoaded = useRef(false);
+  const [draftHydrated, setDraftHydrated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,19 +83,21 @@ export default function NewSettlementScreen() {
       const draft = await loadDraft<{
         payerId: string | null; payeeId: string | null; amount: string;
       }>(accountMemberId, `settlement:${groupId}`);
-      if (!draft) return;
-      if (draft.payerId) setPayerId(draft.payerId);
-      if (draft.payeeId) setPayeeId(draft.payeeId);
-      setAmount(draft.amount);
+      if (draft) {
+        if (draft.payerId) setPayerId(draft.payerId);
+        if (draft.payeeId) setPayeeId(draft.payeeId);
+        setAmount(draft.amount);
+      }
+      setDraftHydrated(true);
     })();
   }, [accountMemberId, groupId]);
 
   useEffect(() => {
-    if (!accountMemberId || !draftLoaded.current) return;
+    if (!accountMemberId || !draftHydrated) return;
     void saveDraft(accountMemberId, `settlement:${groupId}`, {
       payerId, payeeId, amount
     });
-  }, [accountMemberId, amount, groupId, payeeId, payerId]);
+  }, [accountMemberId, amount, draftHydrated, groupId, payeeId, payerId]);
 
   const activeMembers = group?.memberships.filter(
     (membership) => membership.state === 'ACTIVE') ?? [];

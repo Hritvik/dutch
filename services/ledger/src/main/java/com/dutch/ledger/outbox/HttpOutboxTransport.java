@@ -19,6 +19,10 @@ public class HttpOutboxTransport implements OutboxTransport {
         this.url = url;
         // A blank token is random per process and therefore cannot be forged from
         // source; operators must configure the same value on both services.
+        if (serviceToken == null || serviceToken.isBlank()) {
+            org.slf4j.LoggerFactory.getLogger(HttpOutboxTransport.class).warn(
+                    "DUTCH_OUTBOX_SERVICE_TOKEN is unset; this process cannot publish events");
+        }
         this.serviceToken = serviceToken == null || serviceToken.isBlank()
                 ? java.util.UUID.randomUUID().toString() : serviceToken;
         java.net.http.HttpClient http = java.net.http.HttpClient.newBuilder()

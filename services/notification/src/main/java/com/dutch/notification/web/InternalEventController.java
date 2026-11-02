@@ -22,6 +22,10 @@ public class InternalEventController {
         this.deliveries = deliveries;
         // Never fall back to a shared constant: blank means this instance accepts no
         // producer until an operator configures the same secret on both sides.
+        if (serviceToken == null || serviceToken.isBlank()) {
+            org.slf4j.LoggerFactory.getLogger(InternalEventController.class).warn(
+                    "DUTCH_NOTIFICATION_SERVICE_TOKEN is unset; this instance accepts no producer");
+        }
         this.serviceToken = serviceToken == null || serviceToken.isBlank()
                 ? java.util.UUID.randomUUID().toString() : serviceToken;
     }

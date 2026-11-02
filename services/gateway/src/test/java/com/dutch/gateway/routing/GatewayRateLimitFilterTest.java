@@ -54,16 +54,6 @@ class GatewayRateLimitFilterTest {
     }
 
     private static MockHttpServletRequest request() {
-        return request("subject-1");
-    }
-
-    private static MockHttpServletRequest request(String subject) {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/ledger/home");
-        String header = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                "{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
-        String claims = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                ("{\"sub\":\"" + subject + "\"}").getBytes(StandardCharsets.UTF_8));
-        request.addHeader("Authorization", "Bearer " + header + "." + claims + ".signature");
-        return request;
+        return new MockHttpServletRequest("GET", "/api/v1/ledger/home");
     }
 }

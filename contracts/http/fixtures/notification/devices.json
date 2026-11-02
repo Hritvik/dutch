@@ -1,0 +1,11 @@
+{
+  "data": [
+    {
+      "deviceId": "dev_012345678901234567",
+      "platform": "ANDROID",
+      "active": true,
+      "createdAt": "2026-11-02T00:00:00Z",
+      "updatedAt": "2026-11-02T00:00:00Z"
+    }
+  ]
+}

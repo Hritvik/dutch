@@ -17,3 +17,6 @@ management:
     health:
       probes:
         enabled: true
+dutch:
+  notification:
+    service-token: ${DUTCH_NOTIFICATION_SERVICE_TOKEN:}

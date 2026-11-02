@@ -21,3 +21,6 @@ management:
     health:
       probes:
         enabled: true
+dutch:
+  outbox:
+    service-token: ${DUTCH_OUTBOX_SERVICE_TOKEN:}

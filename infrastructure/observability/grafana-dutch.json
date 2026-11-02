@@ -1,0 +1,35 @@
+{
+  "title": "Dutch — service health",
+  "uid": "dutch-service-health",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "panels": [
+    {
+      "title": "Outbox oldest unpublished (seconds)",
+      "type": "timeseries",
+      "targets": [{ "expr": "outbox_oldest_unpublished_seconds" }]
+    },
+    {
+      "title": "Outbox unpublished events",
+      "type": "stat",
+      "targets": [{ "expr": "outbox_unpublished" }]
+    },
+    {
+      "title": "Dead-lettered events (5m)",
+      "type": "stat",
+      "targets": [{ "expr": "increase(outbox_dead_lettered_total[5m])" }]
+    },
+    {
+      "title": "Failed push deliveries (10m)",
+      "type": "timeseries",
+      "targets": [{ "expr": "increase(notification_deliveries_total{status=\"failed\"}[10m])" }]
+    },
+    {
+      "title": "Rate-limited share",
+      "type": "timeseries",
+      "targets": [{
+        "expr": "sum(rate(gateway_rate_limited_total[5m])) / clamp_min(sum(rate(gateway_requests_total[5m])), 0.001)"
+      }]
+    }
+  ]
+}

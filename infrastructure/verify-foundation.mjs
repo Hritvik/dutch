@@ -13,6 +13,9 @@ const requiredFiles = [
   "tools/check-accessibility.mjs",
   "infrastructure/observability/dutch-alerts.yaml",
   "infrastructure/observability/prometheus-scrape.example.yaml",
+  "infrastructure/observability/grafana-dutch.json",
+  "services/Dockerfile",
+  ".dockerignore",
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "infrastructure/aws/modules/foundation/main.tf",
@@ -92,6 +95,17 @@ export function inspectFoundation(repositoryRoot) {
   );
   for (const job of ["ledger", "notification", "gateway"]) {
     if (!scrape.includes(`job_name: ${job}`)) issues.push(`scrape config lacks ${job}`);
+  }
+  const dashboard = JSON.parse(fs.readFileSync(
+    path.join(repositoryRoot, "infrastructure/observability/grafana-dutch.json"),
+    "utf8",
+  ));
+  for (const metric of ["outbox_oldest_unpublished_seconds", "outbox_unpublished",
+    "outbox_dead_lettered_total", "notification_deliveries_total",
+    "gateway_rate_limited_total"]) {
+    if (!JSON.stringify(dashboard).includes(metric)) {
+      issues.push(`Grafana dashboard lacks ${metric}`);
+    }
   }
   const alerts = fs.readFileSync(
     path.join(repositoryRoot, "infrastructure/observability/dutch-alerts.yaml"),

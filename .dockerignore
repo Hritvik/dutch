@@ -1,0 +1,8 @@
+.git
+**/build
+**/node_modules
+**/.gradle
+**/.terraform
+infrastructure/local/.env
+apps/mobile/ios
+apps/mobile/android

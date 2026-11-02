@@ -72,3 +72,21 @@ jobs:
             tofu -chdir=infrastructure/aws/environments/$environment validate
             tofu -chdir=infrastructure/aws/environments/$environment plan -input=false -refresh=false
           done
+
+  container:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [gateway, ledger, notification, ums, iam]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/Dockerfile
+          build-args: SERVICE=${{ matrix.service }}
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

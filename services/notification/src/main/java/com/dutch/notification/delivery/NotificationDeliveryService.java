@@ -32,13 +32,28 @@ public class NotificationDeliveryService {
         String eventType = text(envelope, "eventType");
         String producer = text(envelope, "producer");
         JsonNode payload = envelope.get("payload");
-        if (payload == null || !payload.has("recipientMemberIds")) {
-            throw new IllegalArgumentException("recipientMemberIds are required");
+        if (payload == null) {
+            throw new IllegalArgumentException("payload is required");
         }
         Integer already = jdbc.queryForObject(
                 "SELECT count(*) FROM inbox_event WHERE event_id = ?", Integer.class, eventId);
         if (already != null && already > 0) {
             return List.of();
+        }
+        if ("ums.member.anonymized.v1".equals(eventType)
+                || "iam.identity.deleted.v1".equals(eventType)) {
+            String memberId = payload.path("memberId").asText();
+            if (!memberId.matches("^mem_[A-Za-z0-9_-]{16,128}$")) {
+                throw new IllegalArgumentException("memberId is invalid");
+            }
+            jdbc.update("DELETE FROM notification_delivery WHERE member_id = ?", memberId);
+            jdbc.update("DELETE FROM notification_device WHERE member_id = ?", memberId);
+            jdbc.update("DELETE FROM notification_preference WHERE member_id = ?", memberId);
+            insertInbox(eventId, eventType, producer);
+            return List.of();
+        }
+        if (!payload.has("recipientMemberIds")) {
+            throw new IllegalArgumentException("recipientMemberIds are required");
         }
         String category = eventType.contains("settlement") ? "SETTLEMENT" : "EXPENSE";
         boolean preferenceColumn = category.equals("SETTLEMENT") ? true : false;
@@ -70,16 +85,23 @@ public class NotificationDeliveryService {
                 pending.add(new PendingDelivery(deliveryId, device.pushToken(), title, body));
             }
         }
+        if (!insertInbox(eventId, eventType, producer)) {
+            // A concurrent duplicate won the inbox insert; its deliveries are authoritative.
+            return List.of();
+        }
+        return pending;
+    }
+
+    private boolean insertInbox(UUID eventId, String eventType, String producer) {
         try {
             jdbc.update("""
                     INSERT INTO inbox_event (event_id, event_type, producer, processed_at)
                     VALUES (?, ?, ?, ?)
                     """, eventId, eventType, producer, java.sql.Timestamp.from(Instant.now()));
+            return true;
         } catch (DuplicateKeyException raced) {
-            // A concurrent duplicate won the inbox insert; its deliveries are authoritative.
-            return List.of();
+            return false;
         }
-        return pending;
     }
 
     public void deliver(List<PendingDelivery> pending) {

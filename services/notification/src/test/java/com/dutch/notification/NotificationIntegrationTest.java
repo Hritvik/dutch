@@ -169,6 +169,35 @@ class NotificationIntegrationTest {
     }
 
     @Test
+    void an_anonymization_event_removes_notification_data_and_is_deduped() throws Exception {
+        registerDevice(ADMIN_SUBJECT, DEVICE);
+        String eventId = UUID.randomUUID().toString();
+        String envelope = new ObjectMapper().writeValueAsString(Map.of(
+                "eventId", eventId,
+                "eventType", "ums.member.anonymized.v1",
+                "schemaVersion", 1,
+                "producer", "ums",
+                "aggregate", Map.of("type", "member", "id", ADMIN, "version", 1),
+                "occurredAt", "2026-11-02T00:00:00Z",
+                "payload", Map.of("memberId", ADMIN)));
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            mockMvc.perform(post("/internal/events")
+                            .header("X-Service-Token", "test-service-token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(envelope))
+                    .andExpect(status().isNoContent());
+        }
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM notification_device WHERE member_id = ?", Long.class, ADMIN))
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM inbox_event WHERE event_id = ?", Long.class,
+                UUID.fromString(eventId))).isEqualTo(1);
+    }
+
+    @Test
     void an_internal_event_requires_the_service_token() throws Exception {
         mockMvc.perform(post("/internal/events")
                         .header("X-Service-Token", "wrong")

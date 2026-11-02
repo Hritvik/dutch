@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "artifactDigest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "sourceRevision": "600a1fa",
+  "builtAt": "2026-11-02T00:00:00Z",
+  "workflowRunUrl": "https://github.com/example/dutch/actions/runs/1"
+}

@@ -63,6 +63,8 @@ jobs:
       - uses: opentofu/setup-opentofu@v1
       - run: node --test infrastructure/test/*.test.mjs
       - run: node tools/scan-secrets.mjs
+      - run: node tools/release-record.mjs validate infrastructure/provenance/release-record.example.json
+      - run: node tools/check-accessibility.mjs
       - run: tofu fmt -check -recursive infrastructure/aws
       - run: |
           for environment in development staging production; do

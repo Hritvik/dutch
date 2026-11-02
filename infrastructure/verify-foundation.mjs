@@ -7,6 +7,10 @@ const requiredFiles = [
   "infrastructure/local/bin/up.sh",
   "infrastructure/local/bin/reset.sh",
   "infrastructure/local/bin/test-backend.sh",
+  "infrastructure/local/bin/rehearse-restore.sh",
+  "apps/mobile/eas.json",
+  "tools/release-record.mjs",
+  "tools/check-accessibility.mjs",
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "infrastructure/aws/modules/foundation/main.tf",
@@ -61,6 +65,17 @@ export function inspectFoundation(repositoryRoot) {
     if (!initializer.includes(`create_service_database ${service}`)) {
       issues.push(`local initializer lacks ${service} database isolation`);
     }
+  }
+  const rehearsal = fs.readFileSync(
+    path.join(repositoryRoot, "infrastructure/local/bin/rehearse-restore.sh"),
+    "utf8",
+  );
+  for (const expected of ["pg_dump", "pg_restore", "flyway_schema_history", "projection"]) {
+    if (!rehearsal.includes(expected)) issues.push(`restore rehearsal lacks ${expected}`);
+  }
+  const eas = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "apps/mobile/eas.json"), "utf8"));
+  for (const profile of ["development", "preview", "production"]) {
+    if (!eas.build?.[profile]) issues.push(`EAS build profile ${profile} is missing`);
   }
   for (const expected of [
     "verifyServiceBoundaries",

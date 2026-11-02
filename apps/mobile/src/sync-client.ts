@@ -121,9 +121,6 @@ export async function fetchSyncPage(
   if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
     throw new SyncContractError('The sync limit must be between 1 and 200.');
   }
-  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
-    throw new SyncContractError('The snapshot limit must be between 1 and 500.');
-  }
   const query = new URLSearchParams({ limit: String(limit) });
   if (cursor) query.set('cursor', cursor);
   const response = await fetchImpl(

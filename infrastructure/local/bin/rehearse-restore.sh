@@ -10,10 +10,13 @@ if [[ ! -f .env ]]; then
   echo "Copy .env.example to .env first." >&2
   exit 1
 fi
-set -a
-# shellcheck disable=SC1091
-source ./.env
-set +a
+# Parse key=value pairs without evaluating the file as shell code.
+while IFS='=' read -r key value; do
+  [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+  value="${value%$'\r'}"
+  value="${value%\"}"; value="${value#\"}"
+  export "$key=$value"
+done < .env
 
 compose=(docker compose --env-file .env -f compose.yaml)
 stamp="$(date +%s)"
@@ -39,8 +42,8 @@ for service in "${services[@]}"; do
   dump="$workdir/${service}.dump"
 
   echo "==> ${service}: dump"
-  "${compose[@]}" exec -T postgres pg_dump -Fc -U "$superuser" "$database" > "$dump"
   before="$(psql -d "$database" -Atc "SELECT count(*) FROM flyway_schema_history WHERE success")"
+  "${compose[@]}" exec -T postgres pg_dump -Fc -U "$superuser" "$database" > "$dump"
 
   echo "==> ${service}: restore into ${restored}"
   psql -d postgres -c "CREATE DATABASE \"${restored}\""

@@ -12,6 +12,7 @@ const requiredFiles = [
   "tools/release-record.mjs",
   "tools/check-accessibility.mjs",
   "infrastructure/observability/dutch-alerts.yaml",
+  "infrastructure/observability/prometheus-scrape.example.yaml",
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "infrastructure/aws/modules/foundation/main.tf",
@@ -29,6 +30,17 @@ export function scanTextForForbiddenSecrets(text) {
   const findings = [];
   if (/\bAKIA[0-9A-Z]{16}\b/.test(text)) findings.push("AWS access key");
   if (/\b(?:sk|rk|pk)_[A-Za-z0-9]{20,}\b/.test(text)) findings.push("API token");
+  if (/\bsk_live_[A-Za-z0-9]{16,}\b/.test(text)) findings.push("Stripe live key");
+  if (/\bghp_[A-Za-z0-9]{30,}\b/.test(text)) findings.push("GitHub token");
+  if (/\bgithub_pat_[A-Za-z0-9_]{20,}\b/.test(text)) findings.push("GitHub fine-grained token");
+  if (/\bxox[baprs]-[A-Za-z0-9-]{10,}\b/.test(text)) findings.push("Slack token");
+  if (/\bAIza[0-9A-Za-z_-]{35}\b/.test(text)) findings.push("Google API key");
+  if (/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/.test(text)) {
+    findings.push("JWT credential");
+  }
+  if (/postgres(?:ql)?:\/\/[^\s:/]+:[^\s@]+@/.test(text)) {
+    findings.push("Postgres URL with password");
+  }
   if (/-----BEGIN(?: [A-Z]+)? PRIVATE KEY-----/.test(text)) findings.push("private key");
   return findings;
 }
@@ -73,6 +85,13 @@ export function inspectFoundation(repositoryRoot) {
   );
   for (const expected of ["pg_dump", "pg_restore", "flyway_schema_history", "projection"]) {
     if (!rehearsal.includes(expected)) issues.push(`restore rehearsal lacks ${expected}`);
+  }
+  const scrape = fs.readFileSync(
+    path.join(repositoryRoot, "infrastructure/observability/prometheus-scrape.example.yaml"),
+    "utf8",
+  );
+  for (const job of ["ledger", "notification", "gateway"]) {
+    if (!scrape.includes(`job_name: ${job}`)) issues.push(`scrape config lacks ${job}`);
   }
   const alerts = fs.readFileSync(
     path.join(repositoryRoot, "infrastructure/observability/dutch-alerts.yaml"),

@@ -218,6 +218,18 @@ class SyncControllerTest {
     }
 
     @Test
+    void a_non_numeric_snapshot_limit_uses_the_error_envelope() throws Exception {
+        String snapshot = mockMvc.perform(post("/api/v1/ledger/sync-snapshots")
+                        .with(as(MEMBER_SUBJECT)))
+                .andReturn().getResponse().getContentAsString();
+        String token = JsonPath.read(snapshot, "$.data.token");
+        mockMvc.perform(get("/api/v1/ledger/sync-snapshots/" + token)
+                        .param("limit", "abc").with(as(MEMBER_SUBJECT)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    @Test
     void a_tampered_or_foreign_cursor_is_rejected_and_the_limit_is_bounded() throws Exception {
         String snapshot = mockMvc.perform(post("/api/v1/ledger/sync-snapshots")
                         .with(as(ADMIN_SUBJECT)))

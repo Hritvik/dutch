@@ -79,6 +79,12 @@ test('requests the next snapshot page with the continuation cursor', async () =>
     }, 14, 50);
 });
 
+test('rejects an out-of-range snapshot limit', async () => {
+  await assert.rejects(
+    readSyncSnapshot('https://api.example.test', 'token', 'snap', fetch, null, 501),
+    SyncContractError);
+});
+
 test('rejects a malformed page and an out-of-range limit', async () => {
   await assert.rejects(
     fetchSyncPage('https://api.example.test', 'token', null, 0),

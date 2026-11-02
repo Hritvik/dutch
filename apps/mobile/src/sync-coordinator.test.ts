@@ -155,6 +155,50 @@ test('collects a truncated snapshot across pages before applying it once', async
   assert.equal(store.snapshots[0]?.changes.length, 2);
 });
 
+test('a truncated snapshot without a continuation cursor fails closed', async () => {
+  const store = new FakeStore(null);
+  await assert.rejects(syncProjection('https://api.test', 'token', MEMBER, 'id-1',
+    respond({
+      '/sync-snapshots/mock': () => new Response(JSON.stringify({
+        data: { changes: [change(1)], cursor: 'c1', asOfSequence: 1,
+          truncated: true, nextSnapshotCursor: null }
+      }), { status: 200 }),
+      '/sync-snapshots': () => new Response(JSON.stringify({
+        data: { token: 'mock', asOfSequence: 1 }
+      }), { status: 200 })
+    }), store), /continuation cursor/);
+  assert.equal(store.snapshots.length, 0);
+});
+
+test('a snapshot that never completes exhausts the page budget', async () => {
+  const store = new FakeStore(null);
+  let cursor = 0;
+  await assert.rejects(syncProjection('https://api.test', 'token', MEMBER, 'id-1',
+    respond({
+      '/sync-snapshots/mock': () => {
+        cursor += 1;
+        return new Response(JSON.stringify({
+          data: { changes: [change(cursor)], cursor: 'c', asOfSequence: 100000,
+            truncated: true, nextSnapshotCursor: cursor }
+        }), { status: 200 });
+      },
+      '/sync-snapshots': () => new Response(JSON.stringify({
+        data: { token: 'mock', asOfSequence: 100000 }
+      }), { status: 200 })
+    }), store), /page budget/);
+  assert.equal(store.snapshots.length, 0);
+});
+
+test('a network failure during the snapshot reports offline', async () => {
+  const store = new FakeStore(null);
+  const outcome = await syncProjection('https://api.test', 'token', MEMBER, 'id-1',
+    async () => {
+      throw new TypeError('Network request failed');
+    }, store);
+  assert.deepEqual(outcome, { mode: 'offline', changes: 0 });
+  assert.equal(store.snapshots.length, 0);
+});
+
 test('a network failure reports offline and applies nothing', async () => {
   const store = new FakeStore('cursor-1');
   const outcome = await syncProjection('https://api.test', 'token', MEMBER, 'id-1',

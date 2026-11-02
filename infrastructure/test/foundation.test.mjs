@@ -24,4 +24,10 @@ test("the secret policy catches credential-shaped values while permitting placeh
     ["AWS access key"],
   );
   assert.deepEqual(scanTextForForbiddenSecrets("API_KEY=<set-in-local-env>"), []);
+  assert.deepEqual(scanTextForForbiddenSecrets(`token = ghp_${"a".repeat(36)}`),
+    ["GitHub token"]);
+  assert.deepEqual(scanTextForForbiddenSecrets("postgresql://user:secret@db.example/app"),
+    ["Postgres URL with password"]);
+  assert.deepEqual(scanTextForForbiddenSecrets(`key = AIza${"a".repeat(35)}`),
+    ["Google API key"]);
 });

@@ -70,7 +70,7 @@ class LedgerTransactionRollbackIntegrationTest {
     }
 
     @Test
-    void a_failed_journal_append_rolls_back_the_expense_entries_and_projection() {
+    void a_failure_after_the_journal_append_rolls_back_the_expense_and_projection() {
         Expense expense = Expense.create(EXPENSE, GROUP, "Dinner", 100, "INR", SplitMethod.EQUAL,
                 List.of(new PayerContribution(A, 100)),
                 List.of(new ParticipantShare(A, 50), new ParticipantShare(B, 50)), NOW);

@@ -1,5 +1,6 @@
-# Example Prometheus scrape configuration for the Dutch services. Ingress must
-# expose /actuator/prometheus only to the monitoring network.
+# Example Prometheus scrape configuration for the Dutch services. The explicit
+# PrometheusScrapeController serves /actuator/prometheus; ingress must expose it
+# only to the monitoring network.
 scrape_configs:
   - job_name: ledger
     metrics_path: /actuator/prometheus

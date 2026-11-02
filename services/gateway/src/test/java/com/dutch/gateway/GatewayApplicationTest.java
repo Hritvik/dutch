@@ -23,6 +23,12 @@ class GatewayApplicationTest {
     private JwtDecoder jwtDecoder;
 
     @Test
+    void exposesThePrometheusScrapeEndpoint() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void exposesItsOwnHealthEndpoint() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())

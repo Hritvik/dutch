@@ -87,9 +87,18 @@ class JdbcSyncJournalIntegrationTest {
         transactions.executeWithoutResult(status -> journal.append(List.of(E), "GROUP",
                 "grp_212345678901234567", "tombstone", 2, Map.of(), null, NOW.plusSeconds(3)));
         long tombstoneAsOf = journal.maxSequence(E);
-        var withoutTombstone = journal.snapshot(E, tombstoneAsOf, 0, 10);
-        assertThat(withoutTombstone).extracting(com.dutch.ledger.sync.SyncChange::resourceId)
-                .containsExactly("grp_112345678901234567", "grp_312345678901234567");
+        java.util.List<String> paged = new java.util.ArrayList<>();
+        long cursor = 0;
+        for (int page = 0; page < 10; page++) {
+            var rows = journal.snapshot(E, tombstoneAsOf, cursor, 1);
+            if (rows.isEmpty()) {
+                break;
+            }
+            rows.forEach(row -> paged.add(row.resourceId()));
+            cursor = rows.get(rows.size() - 1).sequence();
+        }
+        assertThat(paged).containsExactly("grp_112345678901234567", "grp_312345678901234567")
+                .doesNotContain("grp_212345678901234567");
     }
 
     @Test

@@ -11,10 +11,11 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 # Parse key=value pairs without evaluating the file as shell code.
-while IFS='=' read -r key value; do
+while IFS='=' read -r key value || [[ -n "$key" ]]; do
   [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
   value="${value%$'\r'}"
   value="${value%\"}"; value="${value#\"}"
+  value="${value%\'}"; value="${value#\'}"
   export "$key=$value"
 done < .env
 

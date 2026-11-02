@@ -6,23 +6,19 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
  * Fixed-window per-identity (JWT sub) or per-IP request budget. Authentication
  * still runs independently; this only sheds abuse before the owning service.
  */
-@Component
 public final class GatewayRateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
@@ -50,7 +46,11 @@ public final class GatewayRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        String key = identity(request);
+        if (windows.size() > 4096) {
+            Instant now = Instant.now();
+            windows.entrySet().removeIf(entry -> entry.getValue().startedAt().plus(window).isBefore(now));
+        }
+        String key = "ip:" + request.getRemoteAddr();
         String correlationId = CorrelationId.resolve(request.getHeader(CorrelationId.HEADER));
         Window current = windows.compute(key, (ignored, existing) -> {
             Instant now = Instant.now();
@@ -72,28 +72,6 @@ public final class GatewayRateLimitFilter extends OncePerRequestFilter {
             return;
         }
         chain.doFilter(request, response);
-    }
-
-    /** The verified subject is not available yet; use the JWT sub only as a bucket key. */
-    private String identity(HttpServletRequest request) {
-        String authorization = request.getHeader("Authorization");
-        if (authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
-            String token = authorization.substring(7).trim();
-            String[] parts = token.split("\\.");
-            if (parts.length == 3) {
-                try {
-                    String payload = new String(Base64.getUrlDecoder().decode(parts[1]),
-                            StandardCharsets.UTF_8);
-                    var node = objectMapper.readTree(payload);
-                    if (node.hasNonNull("sub")) {
-                        return "sub:" + node.get("sub").asText();
-                    }
-                } catch (RuntimeException | IOException ignored) {
-                    // Fall through to the remote address.
-                }
-            }
-        }
-        return "ip:" + request.getRemoteAddr();
     }
 
     private record Window(Instant startedAt, int count) {

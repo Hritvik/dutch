@@ -38,6 +38,9 @@ public class SafetyReportService {
                 || request.details().length() > 1000) {
             throw new IllegalArgumentException("details must be between 1 and 1000 characters");
         }
+        if (request.scopeId() != null && request.scopeId().length() > 256) {
+            throw new IllegalArgumentException("scopeId must be at most 256 characters");
+        }
         String reportId = "rep_" + UUID.randomUUID().toString().replace("-", "");
         jdbc.update("""
                 INSERT INTO safety_report

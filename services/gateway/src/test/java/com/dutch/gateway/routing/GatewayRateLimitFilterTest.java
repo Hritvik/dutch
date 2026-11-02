@@ -36,14 +36,15 @@ class GatewayRateLimitFilterTest {
     }
 
     @Test
-    void keeps_separate_buckets_per_identity_and_ignores_non_api_paths() throws Exception {
+    void keeps_separate_buckets_per_client_address_and_ignores_non_api_paths() throws Exception {
         AtomicInteger calls = new AtomicInteger();
         FilterChain chain = (request, response) -> calls.incrementAndGet();
-        MockHttpServletRequest otherMember = request("other-subject");
+        MockHttpServletRequest otherClient = request();
+        otherClient.setRemoteAddr("10.0.0.9");
 
         filter.doFilter(request(), new MockHttpServletResponse(), chain);
         filter.doFilter(request(), new MockHttpServletResponse(), chain);
-        filter.doFilter(otherMember, new MockHttpServletResponse(), chain);
+        filter.doFilter(otherClient, new MockHttpServletResponse(), chain);
 
         assertThat(calls).hasValue(3);
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/actuator/health")))

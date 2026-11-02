@@ -36,6 +36,9 @@ public class GatewaySecurityConfiguration {
                         .requestMatchers("/api/v1/me", "/api/v1/me/**").authenticated()
                         .requestMatchers("/api/v1/ledger/**").authenticated()
                         .requestMatchers("/api/v1/groups/**").authenticated()
+                        .requestMatchers("/api/v1/notifications/**").authenticated()
+                        .requestMatchers("/api/v1/reports/**").authenticated()
+                        .requestMatchers("/api/v1/privacy/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .exceptionHandling(exceptions -> exceptions

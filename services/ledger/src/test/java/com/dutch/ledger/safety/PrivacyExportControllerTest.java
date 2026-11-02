@@ -51,7 +51,8 @@ class PrivacyExportControllerTest {
                 .andExpect(jsonPath("$.data.groups[*].id").value(org.hamcrest.Matchers.hasItem(groupId)))
                 .andExpect(jsonPath("$.data.directExpenses[*].id")
                         .value(org.hamcrest.Matchers.hasItem(directId)))
-                .andExpect(jsonPath("$.data.entries").doesNotExist());
+                .andExpect(jsonPath("$.data.directExpenses[*].entries").doesNotExist())
+                .andExpect(jsonPath("$.data.directExpenses[*].streamIds").doesNotExist());
 
         mockMvc.perform(get("/api/v1/privacy/export").with(as(OUTSIDER_SUBJECT)))
                 .andExpect(status().isOk())

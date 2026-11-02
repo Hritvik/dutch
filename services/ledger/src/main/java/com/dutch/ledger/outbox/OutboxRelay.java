@@ -77,7 +77,12 @@ public class OutboxRelay {
                 WHERE event_id IN (
                     SELECT event_id FROM outbox_event
                     WHERE published_at IS NULL
+                      AND (next_attempt_at IS NULL OR next_attempt_at <= now())
                       AND (claimed_at IS NULL OR claimed_at < now() - interval '5 minutes')
+                      AND NOT EXISTS (
+                          SELECT 1 FROM outbox_dead_letter d
+                          WHERE d.event_id = outbox_event.event_id
+                      )
                     ORDER BY occurred_at
                     LIMIT ?
                     FOR UPDATE SKIP LOCKED
@@ -114,7 +119,11 @@ public class OutboxRelay {
         }
         Integer attempts = jdbc.queryForObject("""
                 UPDATE outbox_event
-                SET publish_attempts = publish_attempts + 1, claimed_at = NULL, last_error = ?
+                SET publish_attempts = publish_attempts + 1,
+                    claimed_at = NULL,
+                    last_error = ?,
+                    next_attempt_at = now() + make_interval(secs =>
+                        LEAST(3600, POWER(2, LEAST(publish_attempts + 1, 9))::int * 5))
                 WHERE event_id = ?
                 RETURNING publish_attempts
                 """, Integer.class, reason, eventId);
@@ -123,7 +132,8 @@ public class OutboxRelay {
                     INSERT INTO outbox_dead_letter (event_id, reason) VALUES (?, ?)
                     ON CONFLICT (event_id) DO NOTHING
                     """, eventId, reason);
-            jdbc.update("UPDATE outbox_event SET published_at = now() WHERE event_id = ?", eventId);
+            // Leave published_at NULL so publish-lag alerts still see the event; the
+            // claim query excludes dead-lettered rows.
             LOG.error("outbox event {} moved to the dead-letter table", eventId);
         }
     }

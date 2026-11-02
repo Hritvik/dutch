@@ -1,7 +1,6 @@
 package com.dutch.ledger.safety;
 
 import com.dutch.ledger.direct.DirectExpenseRepository;
-import com.dutch.ledger.direct.DirectExpenseView;
 import com.dutch.ledger.group.GroupAccessDeniedException;
 import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.GroupView;
@@ -43,8 +42,8 @@ public class PrivacyExportService {
         List<GroupView> visibleGroups = groups.findReadableBy(actor).stream()
                 .map(group -> group.view())
                 .toList();
-        List<DirectExpenseView> visibleDirect = directExpenses.findInvolving(actor).stream()
-                .map(DirectExpenseView::from)
+        List<PrivacyDirectExpenseView> visibleDirect = directExpenses.findInvolving(actor).stream()
+                .map(PrivacyDirectExpenseView::from)
                 .toList();
 
         Map<String, SeriesView> visibleSeries = new LinkedHashMap<>();

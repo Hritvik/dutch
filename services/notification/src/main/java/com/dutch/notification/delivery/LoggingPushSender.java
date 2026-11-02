@@ -12,6 +12,6 @@ public class LoggingPushSender implements PushSender {
 
     @Override
     public void send(String pushToken, String title, String body) {
-        LOG.info("push queued for token ending {}", pushToken.substring(Math.max(0, pushToken.length() - 4)));
+        LOG.info("push queued for the active provider");
     }
 }

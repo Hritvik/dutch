@@ -68,6 +68,9 @@ class NotificationIntegrationTest {
     @Autowired
     private RecordingPushSender push;
 
+    @Autowired
+    private com.dutch.notification.delivery.DeliveryRetrySweep retrySweep;
+
     @MockBean
     private JwtDecoder jwtDecoder;
 
@@ -150,6 +153,23 @@ class NotificationIntegrationTest {
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM notification_delivery WHERE event_id = ?", String.class,
                 UUID.fromString(skipped))).isEqualTo("SKIPPED");
+    }
+
+    @Test
+    void a_failed_delivery_is_retried_after_the_retry_window() throws Exception {
+        registerDevice(ADMIN_SUBJECT, DEVICE);
+        UUID eventId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO notification_delivery
+                    (delivery_id, member_id, device_id, event_id, category, status, attempts)
+                VALUES ('not_012345678901234567', ?, ?, ?, 'EXPENSE', 'FAILED', 1)
+                """, ADMIN, DEVICE, eventId);
+
+        assertThat(retrySweep.retryOnce()).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM notification_delivery WHERE delivery_id = ?", String.class,
+                "not_012345678901234567")).isEqualTo("SENT");
+        assertThat(push.sent).hasSize(1);
     }
 
     @Test

@@ -35,9 +35,14 @@ public class NotificationDeliveryService {
         if (payload == null) {
             throw new IllegalArgumentException("payload is required");
         }
-        Integer already = jdbc.queryForObject(
-                "SELECT count(*) FROM inbox_event WHERE event_id = ?", Integer.class, eventId);
-        if (already != null && already > 0) {
+        String inserted = jdbc.query("""
+                INSERT INTO inbox_event (event_id, event_type, producer, processed_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (event_id) DO NOTHING
+                RETURNING event_id::text
+                """, (result, index) -> result.getString("event_id"), eventId, eventType,
+                producer, java.sql.Timestamp.from(Instant.now())).stream().findFirst().orElse(null);
+        if (inserted == null) {
             return List.of();
         }
         if ("ums.member.anonymized.v1".equals(eventType)
@@ -49,14 +54,14 @@ public class NotificationDeliveryService {
             jdbc.update("DELETE FROM notification_delivery WHERE member_id = ?", memberId);
             jdbc.update("DELETE FROM notification_device WHERE member_id = ?", memberId);
             jdbc.update("DELETE FROM notification_preference WHERE member_id = ?", memberId);
-            insertInbox(eventId, eventType, producer);
             return List.of();
         }
         if (!payload.has("recipientMemberIds")) {
             throw new IllegalArgumentException("recipientMemberIds are required");
         }
-        String category = eventType.contains("settlement") ? "SETTLEMENT" : "EXPENSE";
-        boolean preferenceColumn = category.equals("SETTLEMENT") ? true : false;
+        String category = eventType.startsWith("ledger.settlement")
+                ? "SETTLEMENT"
+                : eventType.startsWith("ledger.expense") ? "EXPENSE" : "OTHER";
         List<PendingDelivery> pending = new ArrayList<>();
         for (JsonNode recipient : payload.get("recipientMemberIds")) {
             String memberId = recipient.asText();
@@ -82,26 +87,12 @@ public class NotificationDeliveryService {
             for (Device device : devices) {
                 String deliveryId = insertDelivery(memberId, device.deviceId(), eventId, category,
                         "QUEUED");
-                pending.add(new PendingDelivery(deliveryId, device.pushToken(), title, body));
+                if (deliveryId != null) {
+                    pending.add(new PendingDelivery(deliveryId, device.pushToken(), title, body));
+                }
             }
         }
-        if (!insertInbox(eventId, eventType, producer)) {
-            // A concurrent duplicate won the inbox insert; its deliveries are authoritative.
-            return List.of();
-        }
         return pending;
-    }
-
-    private boolean insertInbox(UUID eventId, String eventType, String producer) {
-        try {
-            jdbc.update("""
-                    INSERT INTO inbox_event (event_id, event_type, producer, processed_at)
-                    VALUES (?, ?, ?, ?)
-                    """, eventId, eventType, producer, java.sql.Timestamp.from(Instant.now()));
-            return true;
-        } catch (DuplicateKeyException raced) {
-            return false;
-        }
     }
 
     public void deliver(List<PendingDelivery> pending) {
@@ -111,15 +102,13 @@ public class NotificationDeliveryService {
                 jdbc.update("UPDATE notification_delivery SET status = 'SENT' WHERE delivery_id = ?",
                         delivery.deliveryId());
             } catch (RuntimeException failure) {
-                jdbc.update("UPDATE notification_delivery SET status = 'FAILED' WHERE delivery_id = ?",
-                        delivery.deliveryId());
+                jdbc.update("""
+                        UPDATE notification_delivery
+                        SET status = 'FAILED', attempts = attempts + 1
+                        WHERE delivery_id = ?
+                        """, delivery.deliveryId());
             }
         }
-    }
-
-    /** A notification-owned privacy deletion; events remain deduplicated. */
-    public void deleteRecipientData(String memberId) {
-        jdbc.update("DELETE FROM notification_delivery WHERE member_id = ?", memberId);
     }
 
     private boolean preference(String memberId, String category) {
@@ -134,13 +123,14 @@ public class NotificationDeliveryService {
     private String insertDelivery(String memberId, String deviceId, UUID eventId,
                                   String category, String status) {
         String deliveryId = "not_" + UUID.randomUUID().toString().replace("-", "");
-        jdbc.update("""
+        return jdbc.query("""
                 INSERT INTO notification_delivery
                     (delivery_id, member_id, device_id, event_id, category, status)
                 VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT (event_id, device_id) DO NOTHING
-                """, deliveryId, memberId, deviceId, eventId, category, status);
-        return deliveryId;
+                RETURNING delivery_id
+                """, (result, index) -> result.getString("delivery_id"), deliveryId, memberId,
+                deviceId, eventId, category, status).stream().findFirst().orElse(null);
     }
 
     private static String text(JsonNode node, String name) {

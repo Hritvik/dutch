@@ -48,7 +48,11 @@ public class DeviceService {
                 INSERT INTO notification_preference (member_id) VALUES (?)
                 ON CONFLICT (member_id) DO NOTHING
                 """, memberId);
-        return device(deviceId, memberId);
+        try {
+            return device(deviceId, memberId);
+        } catch (org.springframework.dao.EmptyResultDataAccessException raced) {
+            throw new IllegalArgumentException("that device belongs to another member");
+        }
     }
 
     public List<Map<String, Object>> devices(String appSubject) {

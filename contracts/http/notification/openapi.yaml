@@ -158,6 +158,31 @@ components:
             - IOS
         active:
           type: boolean
+    DeviceListView:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceId
+        - platform
+        - active
+        - createdAt
+        - updatedAt
+      properties:
+        deviceId:
+          $ref: "#/components/schemas/DeviceId"
+        platform:
+          type: string
+          enum:
+            - ANDROID
+            - IOS
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     DeviceResponse:
       type: object
       additionalProperties: false
@@ -176,16 +201,7 @@ components:
           type: array
           maxItems: 100
           items:
-            allOf:
-              - $ref: "#/components/schemas/DeviceView"
-              - type: object
-                properties:
-                  createdAt:
-                    type: string
-                    format: date-time
-                  updatedAt:
-                    type: string
-                    format: date-time
+            $ref: "#/components/schemas/DeviceListView"
     PreferenceRequest:
       type: object
       additionalProperties: false

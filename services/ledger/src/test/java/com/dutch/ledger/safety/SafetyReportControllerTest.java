@@ -60,6 +60,13 @@ class SafetyReportControllerTest {
                         .content("{\"category\":\"SPAM\",\"details\":\"text\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("unauthorized"));
+
+        mockMvc.perform(post("/api/v1/reports").with(as(ADMIN_SUBJECT))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"SPAM\",\"scopeId\":\""
+                                + "x".repeat(257) + "\",\"details\":\"text\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("invalid_request"));
     }
 
     private static RequestPostProcessor as(String subject) {

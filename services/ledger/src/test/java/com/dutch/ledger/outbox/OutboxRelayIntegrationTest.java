@@ -75,6 +75,10 @@ class OutboxRelayIntegrationTest {
 
         for (int attempt = 0; attempt < 5; attempt++) {
             relay.relayOnce();
+            // The relay backs off; move the due time forward for the next attempt.
+            jdbc.update("""
+                    UPDATE outbox_event SET next_attempt_at = now() WHERE aggregate_id = ?
+                    """, "exp_112345678901234567");
         }
 
         assertThat(jdbc.queryForObject(
@@ -86,7 +90,7 @@ class OutboxRelayIntegrationTest {
                 Long.class, "exp_112345678901234567")).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT published_at FROM outbox_event WHERE aggregate_id = ?",
-                java.sql.Timestamp.class, "exp_112345678901234567")).isNotNull();
+                java.sql.Timestamp.class, "exp_112345678901234567")).isNull();
         assertThat(relay.relayOnce()).isZero();
 
         // Rehearsed recovery: clear the dead letter, reset the row, and replay safely.
@@ -96,7 +100,7 @@ class OutboxRelayIntegrationTest {
                 """, "exp_112345678901234567");
         jdbc.update("""
                 UPDATE outbox_event SET published_at = NULL, claimed_at = NULL,
-                    publish_attempts = 0, last_error = NULL
+                    publish_attempts = 0, last_error = NULL, next_attempt_at = now()
                 WHERE aggregate_id = ?
                 """, "exp_112345678901234567");
         TestTransport recovered = new TestTransport(false);

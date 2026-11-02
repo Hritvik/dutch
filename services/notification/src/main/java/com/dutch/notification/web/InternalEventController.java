@@ -18,15 +18,20 @@ public class InternalEventController {
     private final String serviceToken;
 
     public InternalEventController(NotificationDeliveryService deliveries,
-                                   @Value("${dutch.notification.service-token:dev-service-token-change-me}") String serviceToken) {
+                                   @Value("${dutch.notification.service-token:}") String serviceToken) {
         this.deliveries = deliveries;
-        this.serviceToken = serviceToken;
+        // Never fall back to a shared constant: blank means this instance accepts no
+        // producer until an operator configures the same secret on both sides.
+        this.serviceToken = serviceToken == null || serviceToken.isBlank()
+                ? java.util.UUID.randomUUID().toString() : serviceToken;
     }
 
     @PostMapping("/events")
     ResponseEntity<Void> consume(@RequestHeader("X-Service-Token") String token,
                                  @RequestBody JsonNode envelope) {
-        if (!serviceToken.equals(token)) {
+        if (token == null || !java.security.MessageDigest.isEqual(
+                serviceToken.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                token.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             return ResponseEntity.status(401).build();
         }
         var pending = deliveries.consume(envelope);

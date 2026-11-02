@@ -15,10 +15,18 @@ public class HttpOutboxTransport implements OutboxTransport {
 
     public HttpOutboxTransport(
             @Value("${dutch.outbox.notification-url:http://localhost:8088/internal/events}") String url,
-            @Value("${dutch.outbox.service-token:dev-service-token-change-me}") String serviceToken) {
+            @Value("${dutch.outbox.service-token:}") String serviceToken) {
         this.url = url;
-        this.serviceToken = serviceToken;
-        this.client = RestClient.create();
+        // A blank token is random per process and therefore cannot be forged from
+        // source; operators must configure the same value on both services.
+        this.serviceToken = serviceToken == null || serviceToken.isBlank()
+                ? java.util.UUID.randomUUID().toString() : serviceToken;
+        java.net.http.HttpClient http = java.net.http.HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(3))
+                .build();
+        var factory = new org.springframework.http.client.JdkClientHttpRequestFactory(http);
+        factory.setReadTimeout(java.time.Duration.ofSeconds(5));
+        this.client = RestClient.builder().requestFactory(factory).build();
     }
 
     @Override

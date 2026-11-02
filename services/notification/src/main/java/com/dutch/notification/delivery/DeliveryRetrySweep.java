@@ -47,7 +47,8 @@ public class DeliveryRetrySweep {
         int sent = 0;
         for (Retry retry : retries) {
             try {
-                push.send(retry.pushToken(), "Dutch", "Open Dutch to review the latest Activity.");
+                push.send(new PushSender.PushMessage(retry.deliveryId(), retry.pushToken(),
+                        "Dutch", "Open Dutch to review the latest Activity."));
                 jdbc.update("UPDATE notification_delivery SET status = 'SENT' WHERE delivery_id = ?",
                         retry.deliveryId());
                 meters.counter("notification.deliveries", "status", "retried").increment();

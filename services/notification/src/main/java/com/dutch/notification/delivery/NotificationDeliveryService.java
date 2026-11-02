@@ -106,7 +106,8 @@ public class NotificationDeliveryService {
     public void deliver(List<PendingDelivery> pending) {
         for (PendingDelivery delivery : pending) {
             try {
-                push.send(delivery.pushToken(), delivery.title(), delivery.body());
+                push.send(new PushSender.PushMessage(delivery.deliveryId(), delivery.pushToken(),
+                        delivery.title(), delivery.body()));
                 jdbc.update("UPDATE notification_delivery SET status = 'SENT' WHERE delivery_id = ?",
                         delivery.deliveryId());
                 meters.counter("notification.deliveries", "status", "sent").increment();

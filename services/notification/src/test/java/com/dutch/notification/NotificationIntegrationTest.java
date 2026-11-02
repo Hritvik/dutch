@@ -317,8 +317,8 @@ class NotificationIntegrationTest {
         private final List<String> sent = new CopyOnWriteArrayList<>();
 
         @Override
-        public void send(String pushToken, String title, String body) {
-            sent.add(title);
+        public void send(PushSender.PushMessage message) {
+            sent.add(message.title());
         }
     }
 }

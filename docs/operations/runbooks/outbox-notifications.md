@@ -21,6 +21,14 @@
    `outbox_dead_letter` row, reset `published_at = NULL, claimed_at = NULL,
    publish_attempts = 0`, and let the relay retry. Never edit financial source rows.
 
+## Push webhook
+
+Set `DUTCH_PUSH_WEBHOOK_URL` and `DUTCH_PUSH_WEBHOOK_TOKEN` on Notification to send
+pushes to a provider adapter. The adapter receives the delivery id and must call
+`POST /internal/receipts` with `X-Service-Token` and
+`{"deliveryId","status":"DELIVERED|FAILED","providerMessageId"}`. Without a webhook the
+logging adapter is used and no real push is sent.
+
 ## Notification consumer
 
 1. `409`/`500` from `/internal/events` leaves the outbox row unpublished; investigate the

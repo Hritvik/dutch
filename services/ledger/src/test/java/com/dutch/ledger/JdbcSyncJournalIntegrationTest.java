@@ -80,7 +80,7 @@ class JdbcSyncJournalIntegrationTest {
                     Map.of(), null, NOW);
         });
 
-        var snapshot = journal.snapshot(C, journal.maxSequence(C), 1000);
+        var snapshot = journal.snapshot(C, journal.maxSequence(C), 0, 1000);
         assertThat(snapshot).hasSize(1);
         assertThat(snapshot.get(0).resourceId()).isEqualTo("exp_112345678901234567");
         assertThat(snapshot.get(0).payload()).containsEntry("description", "New");

@@ -74,6 +74,57 @@ paths:
           $ref: '#/components/responses/Unavailable'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/notifications/devices:
+    get:
+      operationId: gatewayNotificationDevices
+      description: Forwarded to the Notification service; device semantics live there.
+      security:
+        - bearerAuth: []
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+    post:
+      operationId: gatewayRegisterDevice
+      description: Forwarded to the Notification service; device semantics live there.
+      security:
+        - bearerAuth: []
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/privacy/export:
+    get:
+      operationId: gatewayPrivacyExport
+      description: Forwarded to the Ledger privacy export.
+      security:
+        - bearerAuth: []
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/reports:
+    post:
+      operationId: gatewayCreateReport
+      description: Forwarded to the Ledger safety-report intake.
+      security:
+        - bearerAuth: []
+      responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
   /actuator/health/readiness:
     get:
       operationId: getReadiness

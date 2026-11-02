@@ -33,6 +33,7 @@ class GatewayRateLimitFilterTest {
         assertThat(limited.getStatus()).isEqualTo(429);
         assertThat(limited.getHeader("Retry-After")).isEqualTo("60");
         assertThat(limited.getContentAsString()).contains("\"code\":\"rate_limited\"");
+        assertThat(limited.getContentAsString()).contains("Request rate limit exceeded");
     }
 
     @Test

@@ -54,13 +54,29 @@ test('creates and reads a snapshot', async () => {
 
   const page = await readSyncSnapshot('https://api.example.test', 'token', 'snap',
     async (url) => {
-      assert.match(String(url), /sync-snapshots\/snap$/);
+      assert.match(String(url), /sync-snapshots\/snap\?limit=200$/);
       return new Response(JSON.stringify({
-        data: { changes: [change], cursor: 'cursor-9', asOfSequence: 9 }
+        data: {
+          changes: [change], cursor: 'cursor-9', asOfSequence: 9,
+          truncated: false, nextSnapshotCursor: null
+        }
       }), { status: 200 });
     });
   assert.equal(page.asOfSequence, 9);
   assert.equal(page.cursor, 'cursor-9');
+});
+
+test('requests the next snapshot page with the continuation cursor', async () => {
+  await readSyncSnapshot('https://api.example.test', 'token', 'snap',
+    async (url) => {
+      assert.match(String(url), /cursor=14/);
+      return new Response(JSON.stringify({
+        data: {
+          changes: [change], cursor: 'cursor-20', asOfSequence: 20,
+          truncated: false, nextSnapshotCursor: null
+        }
+      }), { status: 200 });
+    }, 14, 50);
 });
 
 test('rejects a malformed page and an out-of-range limit', async () => {

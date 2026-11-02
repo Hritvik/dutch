@@ -26,6 +26,8 @@ export type SyncSnapshotPage = {
   changes: SyncChange[];
   cursor: string;
   asOfSequence: number;
+  truncated: boolean;
+  nextSnapshotCursor: number | null;
 };
 
 export class SyncContractError extends Error {
@@ -159,10 +161,15 @@ export async function readSyncSnapshot(
   baseUrl: string,
   accessToken: string,
   token: string,
-  fetchImpl: ApiFetch = fetch
+  fetchImpl: ApiFetch = fetch,
+  cursor?: number | null,
+  limit = 200
 ): Promise<SyncSnapshotPage> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (cursor !== undefined && cursor !== null) query.set('cursor', String(cursor));
   const response = await fetchImpl(
-    apiUrl(baseUrl, `/api/v1/ledger/sync-snapshots/${encodeURIComponent(token)}`),
+    apiUrl(baseUrl,
+      `/api/v1/ledger/sync-snapshots/${encodeURIComponent(token)}?${query.toString()}`),
     { method: 'GET', headers: { accept: 'application/json', authorization: `Bearer ${accessToken}` } }
   );
   if (!response.ok) {
@@ -170,12 +177,19 @@ export async function readSyncSnapshot(
   }
   const data = parsePageData(await response.json());
   if (typeof data.cursor !== 'string'
-      || typeof data.asOfSequence !== 'number' || !Number.isInteger(data.asOfSequence)) {
+      || typeof data.asOfSequence !== 'number' || !Number.isInteger(data.asOfSequence)
+      || typeof data.truncated !== 'boolean'
+      || (data.nextSnapshotCursor !== undefined && data.nextSnapshotCursor !== null
+        && (typeof data.nextSnapshotCursor !== 'number'
+          || !Number.isInteger(data.nextSnapshotCursor)))) {
     throw new SyncContractError('Sync snapshot page shape is invalid.');
   }
   return {
     changes: parseChanges(data.changes),
     cursor: data.cursor,
-    asOfSequence: data.asOfSequence
+    asOfSequence: data.asOfSequence,
+    truncated: data.truncated,
+    nextSnapshotCursor: data.nextSnapshotCursor === undefined || data.nextSnapshotCursor === null
+      ? null : data.nextSnapshotCursor
   };
 }

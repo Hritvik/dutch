@@ -25,6 +25,7 @@ public final class SyncViews {
     public record Snapshot(String token, long asOfSequence) {
     }
 
-    public record SnapshotPage(List<Change> changes, String cursor, long asOfSequence) {
+    public record SnapshotPage(List<Change> changes, String cursor, long asOfSequence,
+                               boolean truncated, Long nextSnapshotCursor) {
     }
 }

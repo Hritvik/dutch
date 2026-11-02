@@ -446,6 +446,21 @@ paths:
           schema:
             type: string
             maxLength: 2048
+        - name: cursor
+          in: query
+          required: false
+          description: The previous page's nextSnapshotCursor.
+          schema:
+            type: string
+            maxLength: 20
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 200
       responses:
         "200":
           description: The caller's current projections and the starting cursor.
@@ -1524,6 +1539,7 @@ components:
         - changes
         - cursor
         - asOfSequence
+        - truncated
       properties:
         changes:
           type: array
@@ -1534,6 +1550,13 @@ components:
         asOfSequence:
           type: integer
           minimum: 0
+        truncated:
+          type: boolean
+        nextSnapshotCursor:
+          anyOf:
+            - type: integer
+              minimum: 0
+            - type: "null"
     SyncSnapshotPageResponse:
       type: object
       additionalProperties: false

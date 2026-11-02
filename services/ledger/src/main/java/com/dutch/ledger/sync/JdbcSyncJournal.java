@@ -69,7 +69,7 @@ public class JdbcSyncJournal implements SyncJournal {
     }
 
     @Override
-    public List<SyncChange> snapshot(MemberId recipient, long asOfSequence, int limit) {
+    public List<SyncChange> snapshot(MemberId recipient, long asOfSequence, long afterSequence, int limit) {
         return jdbc.query("""
                 SELECT sequence, resource_type, resource_id, operation, resource_version,
                     payload::text AS payload, action_id, schema_version, occurred_at
@@ -81,10 +81,11 @@ public class JdbcSyncJournal implements SyncJournal {
                     WHERE member_id = ? AND sequence <= ?
                     ORDER BY resource_type, resource_id, sequence DESC
                 ) latest
-                WHERE operation <> 'tombstone'
+                WHERE operation <> 'tombstone' AND sequence > ?
                 ORDER BY sequence
                 LIMIT ?
-                """, (result, index) -> change(result), recipient.value(), asOfSequence, limit);
+                """, (result, index) -> change(result), recipient.value(), asOfSequence,
+                afterSequence, limit);
     }
 
     private SyncChange change(java.sql.ResultSet result) throws java.sql.SQLException {

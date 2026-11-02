@@ -35,8 +35,12 @@ public class SyncController {
     }
 
     @GetMapping("/sync-snapshots/{token}")
-    ResponseEntity<Map<String, Object>> snapshot(@AuthenticationPrincipal Jwt jwt,
-                                                 @PathVariable String token) {
-        return ResponseEntity.ok(Map.of("data", sync.readSnapshot(jwt.getSubject(), token)));
+    ResponseEntity<Map<String, Object>> snapshot(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String token,
+            @RequestParam(name = "cursor", required = false) String cursor,
+            @RequestParam(name = "limit", defaultValue = "200") int limit) {
+        return ResponseEntity.ok(Map.of("data",
+                sync.readSnapshot(jwt.getSubject(), token, cursor, limit)));
     }
 }

@@ -77,7 +77,8 @@ test('recovers an expired cursor with a snapshot and catch-up page', async () =>
   const outcome = await syncProjection('https://api.test', 'token', MEMBER, 'id-1',
     respond({
       '/sync-snapshots/mock': () => new Response(JSON.stringify({
-        data: { changes: [change(1)], cursor: 'snapshot-cursor', asOfSequence: 1 }
+        data: { changes: [change(1)], cursor: 'snapshot-cursor', asOfSequence: 1,
+          truncated: false, nextSnapshotCursor: null }
       }), { status: 200 }),
       '/sync-snapshots': () => new Response(JSON.stringify({
         data: { token: 'mock', asOfSequence: 1 }
@@ -105,7 +106,8 @@ test('a missing cursor starts with a snapshot', async () => {
   const outcome = await syncProjection('https://api.test', 'token', MEMBER, 'id-1',
     respond({
       '/sync-snapshots/mock': () => new Response(JSON.stringify({
-        data: { changes: [change(1), change(2)], cursor: 'c2', asOfSequence: 2 }
+        data: { changes: [change(1), change(2)], cursor: 'c2', asOfSequence: 2,
+          truncated: false, nextSnapshotCursor: null }
       }), { status: 200 }),
       '/sync-snapshots': () => new Response(JSON.stringify({
         data: { token: 'mock', asOfSequence: 2 }
@@ -116,6 +118,41 @@ test('a missing cursor starts with a snapshot', async () => {
     }), store);
   assert.equal(outcome.mode, 'snapshot');
   assert.equal(outcome.changes, 2);
+});
+
+test('collects a truncated snapshot across pages before applying it once', async () => {
+  const store = new FakeStore(null);
+  let snapshotPages = 0;
+  const outcome = await syncProjection('https://api.test', 'token', MEMBER, 'id-1',
+    respond({
+      '/sync-snapshots/mock?limit=200': () => {
+        snapshotPages += 1;
+        if (snapshotPages === 1) {
+          return new Response(JSON.stringify({
+            data: {
+              changes: [change(1)], cursor: 'c2', asOfSequence: 2,
+              truncated: true, nextSnapshotCursor: 1
+            }
+          }), { status: 200 });
+        }
+        return new Response(JSON.stringify({
+          data: {
+            changes: [change(2)], cursor: 'c2', asOfSequence: 2,
+            truncated: false, nextSnapshotCursor: null
+          }
+        }), { status: 200 });
+      },
+      '/sync-snapshots': () => new Response(JSON.stringify({
+        data: { token: 'mock', asOfSequence: 2 }
+      }), { status: 200 }),
+      '/api/v1/ledger/sync?': () => new Response(JSON.stringify({
+        data: { changes: [], nextCursor: 'c2' }
+      }), { status: 200 })
+    }), store);
+  assert.equal(outcome.mode, 'snapshot');
+  assert.equal(outcome.changes, 2);
+  assert.equal(store.snapshots.length, 1);
+  assert.equal(store.snapshots[0]?.changes.length, 2);
 });
 
 test('a network failure reports offline and applies nothing', async () => {

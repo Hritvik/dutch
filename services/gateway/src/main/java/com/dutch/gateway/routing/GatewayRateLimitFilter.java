@@ -66,7 +66,7 @@ public final class GatewayRateLimitFilter extends OncePerRequestFilter {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("code", "rate_limited");
-            error.put("message", "Too many requests. Retry later.");
+            error.put("message", "Request rate limit exceeded");
             error.put("correlationId", correlationId);
             response.getWriter().write(objectMapper.writeValueAsString(Map.of("error", error)));
             return;

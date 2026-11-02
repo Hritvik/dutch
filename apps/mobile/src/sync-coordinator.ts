@@ -87,10 +87,29 @@ async function fullSync(
 ): Promise<SyncOutcome> {
   try {
     const snapshot = await createSyncSnapshot(baseUrl, accessToken, fetchImpl);
-    const page = await readSyncSnapshot(baseUrl, accessToken, snapshot.token, fetchImpl);
-    await store.applySnapshot(memberId, page.changes, page.cursor);
-    let changes = page.changes.length;
-    let cursor = page.cursor;
+    const collected: SyncChange[] = [];
+    let cursor = '';
+    let snapshotCursor: number | null = null;
+    let complete = false;
+    for (let page = 0; page < 20; page++) {
+      const snapshotPage = await readSyncSnapshot(baseUrl, accessToken, snapshot.token,
+        fetchImpl, snapshotCursor, 200);
+      collected.push(...snapshotPage.changes);
+      cursor = snapshotPage.cursor;
+      if (!snapshotPage.truncated) {
+        complete = true;
+        break;
+      }
+      if (snapshotPage.nextSnapshotCursor === null) {
+        throw new SyncContractError('A truncated snapshot page has no continuation cursor.');
+      }
+      snapshotCursor = snapshotPage.nextSnapshotCursor;
+    }
+    if (!complete) {
+      throw new SyncContractError('The snapshot did not complete within the page budget.');
+    }
+    await store.applySnapshot(memberId, collected, cursor);
+    let changes = collected.length;
     for (let attempt = 0; attempt < CATCH_UP_PAGES; attempt++) {
       const incremental = await fetchSyncPage(baseUrl, accessToken, cursor, PAGE_LIMIT, fetchImpl);
       await store.applyPage(memberId, incremental);

@@ -167,6 +167,44 @@ class SyncControllerTest {
     }
 
     @Test
+    void a_large_snapshot_is_paged_without_dropping_resources() throws Exception {
+        journal.append(List.of(MEMBER), "GROUP", "grp_112345678901234567", "upsert", 1,
+                Map.of("name", "One"), null, Instant.now());
+        journal.append(List.of(MEMBER), "GROUP", "grp_212345678901234567", "upsert", 1,
+                Map.of("name", "Two"), null, Instant.now());
+        journal.append(List.of(MEMBER), "GROUP", "grp_312345678901234567", "upsert", 1,
+                Map.of("name", "Three"), null, Instant.now());
+
+        String snapshot = mockMvc.perform(post("/api/v1/ledger/sync-snapshots")
+                        .with(as(MEMBER_SUBJECT)))
+                .andReturn().getResponse().getContentAsString();
+        String token = JsonPath.read(snapshot, "$.data.token");
+
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        Integer cursor = null;
+        for (int page = 0; page < 20; page++) {
+            var request = get("/api/v1/ledger/sync-snapshots/" + token)
+                    .param("limit", "2").with(as(MEMBER_SUBJECT));
+            if (cursor != null) {
+                request = request.param("cursor", String.valueOf(cursor));
+            }
+            String body = mockMvc.perform(request)
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            seen.addAll(JsonPath.read(body, "$.data.changes[*].resourceId"));
+            Boolean truncated = JsonPath.read(body, "$.data.truncated");
+            if (!truncated) {
+                break;
+            }
+            cursor = JsonPath.read(body, "$.data.nextSnapshotCursor");
+        }
+
+        org.assertj.core.api.Assertions.assertThat(seen)
+                .contains("grp_112345678901234567", "grp_212345678901234567",
+                        "grp_312345678901234567");
+    }
+
+    @Test
     void a_tampered_or_foreign_cursor_is_rejected_and_the_limit_is_bounded() throws Exception {
         String snapshot = mockMvc.perform(post("/api/v1/ledger/sync-snapshots")
                         .with(as(ADMIN_SUBJECT)))

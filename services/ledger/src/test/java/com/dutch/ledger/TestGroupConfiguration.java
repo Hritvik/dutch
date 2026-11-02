@@ -246,10 +246,11 @@ public class TestGroupConfiguration {
         }
 
         @Override
-        public java.util.List<SyncChange> snapshot(MemberId recipient, long asOfSequence, int limit) {
+        public java.util.List<SyncChange> snapshot(MemberId recipient, long asOfSequence,
+                                                    long afterSequence, int limit) {
             Map<String, SyncChange> latest = new java.util.LinkedHashMap<>();
             for (SyncChange change : changes.getOrDefault(recipient, java.util.List.of())) {
-                if (change.sequence() > asOfSequence) {
+                if (change.sequence() > asOfSequence || change.sequence() <= afterSequence) {
                     continue;
                 }
                 latest.put(change.resourceType() + ":" + change.resourceId(), change);

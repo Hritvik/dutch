@@ -43,11 +43,28 @@ public class SyncService {
     }
 
     @Transactional(readOnly = true)
-    public SyncViews.SnapshotPage readSnapshot(String appSubject, String token) {
+    public SyncViews.SnapshotPage readSnapshot(String appSubject, String token, String cursor,
+                                               int limit) {
         MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
         long asOf = codec.verifySnapshot(token, actor);
-        List<SyncChange> changes = journal.snapshot(actor, asOf, 1000);
+        if (limit < 1 || limit > 500) {
+            throw new IllegalArgumentException("limit must be between 1 and 500");
+        }
+        long after = 0;
+        if (cursor != null && !cursor.isBlank()) {
+            try {
+                after = Long.parseLong(cursor);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("cursor is invalid");
+            }
+            if (after < 0 || after > asOf) {
+                throw new IllegalArgumentException("cursor is invalid");
+            }
+        }
+        List<SyncChange> changes = journal.snapshot(actor, asOf, after, limit);
+        boolean truncated = changes.size() == limit;
+        Long next = truncated ? changes.get(changes.size() - 1).sequence() : null;
         return new SyncViews.SnapshotPage(changes.stream().map(SyncViews.Change::from).toList(),
-                codec.sign(actor, asOf), asOf);
+                codec.sign(actor, asOf), asOf, truncated, next);
     }
 }

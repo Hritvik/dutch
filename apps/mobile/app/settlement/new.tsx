@@ -15,6 +15,7 @@ import { sessionStore } from '../../src/expo-session-store';
 import { formatMinor, parseMajorToMinor } from '../../src/expenses-client';
 import { fetchGroup, type GroupView } from '../../src/groups-client';
 import { fetchMemberProfile } from '../../src/profile-client';
+import { deleteDraft, loadDraft, saveDraft } from '../../src/projection-db';
 import {
   SettlementHttpError,
   recordSettlement,
@@ -42,6 +43,7 @@ export default function NewSettlementScreen() {
   const idempotencyKey = useRef<string | null>(null);
   const occurredAt = useRef<string | null>(null);
   const voidKey = useRef<string | null>(null);
+  const draftLoaded = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +72,27 @@ export default function NewSettlementScreen() {
       cancelled = true;
     };
   }, [groupId]);
+
+  useEffect(() => {
+    if (!memberId || draftLoaded.current) return;
+    draftLoaded.current = true;
+    void (async () => {
+      const draft = await loadDraft<{
+        payerId: string | null; payeeId: string | null; amount: string;
+      }>(memberId, 'settlement');
+      if (!draft) return;
+      if (draft.payerId) setMemberId(draft.payerId);
+      if (draft.payeeId) setPayeeId(draft.payeeId);
+      setAmount(draft.amount);
+    })();
+  }, [memberId]);
+
+  useEffect(() => {
+    if (!memberId || !draftLoaded.current) return;
+    void saveDraft(memberId, 'settlement', {
+      payerId: memberId, payeeId, amount
+    });
+  }, [amount, memberId, payeeId]);
 
   const activeMembers = group?.memberships.filter(
     (membership) => membership.state === 'ACTIVE') ?? [];
@@ -119,6 +142,7 @@ export default function NewSettlementScreen() {
       });
       setResult(recorded);
       setStep('result');
+      await deleteDraft(memberId, 'settlement');
     } catch (failure) {
       // Keep the key and occurredAt: an ambiguous failure must replay the same
       // command rather than record a second settlement.

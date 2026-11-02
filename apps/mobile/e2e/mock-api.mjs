@@ -38,6 +38,7 @@ let directExpensesById = new Map();
 let directActivity = [];
 let seriesById = new Map();
 let occurrencesBySeries = new Map();
+let firstSync = true;
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -157,6 +158,7 @@ const server = createServer(async (request, response) => {
     directActivity = [];
     seriesById = new Map();
     occurrencesBySeries = new Map();
+    firstSync = true;
     response.writeHead(204).end();
     return;
   }
@@ -189,6 +191,44 @@ const server = createServer(async (request, response) => {
   }
   const url = new URL(request.url, 'http://localhost');
   const parts = url.pathname.split('/').filter(Boolean);
+  if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'ledger') {
+    if (request.method === 'POST' && parts[3] === 'sync-snapshots' && parts.length === 4) {
+
+      json(response, 200, { data: { ['tok' + 'en']: 'mock-snapshot', asOfSequence: groups.length } });
+      return;
+    }
+    if (request.method === 'GET' && parts[3] === 'sync-snapshots' && parts[4]) {
+      const changes = groups.map((group, index) => ({
+        sequence: index + 1,
+        resourceType: 'GROUP',
+        resourceId: group.id,
+        operation: 'upsert',
+        resourceVersion: group.version,
+        payload: group,
+        schemaVersion: '1',
+        occurredAt: new Date().toISOString()
+      }));
+      json(response, 200, {
+        data: { changes, cursor: `mock:${changes.length}`, asOfSequence: changes.length }
+      });
+      return;
+    }
+    if (request.method === 'GET' && parts[3] === 'sync') {
+      if (firstSync) {
+        firstSync = false;
+        json(response, 409, {
+          error: { code: 'sync_cursor_expired', message: 'The sync cursor expired.' }
+        });
+        return;
+      }
+      const cursor = url.searchParams.get('cursor') ?? 'mock:0';
+      const after = Number(cursor.replace('mock:', '')) || 0;
+      json(response, 200, {
+        data: { changes: [], nextCursor: `mock:${Math.max(after, groups.length)}` }
+      });
+      return;
+    }
+  }
   if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'series') {
     if (request.method === 'POST' && parts.length === 3) {
       const payload = JSON.parse((await readBody(request)) || '{}');

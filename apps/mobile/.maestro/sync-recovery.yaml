@@ -1,0 +1,7 @@
+appId: com.dutch.mobile
+---
+- launchApp
+- extendedWaitUntil:
+    visible: ".*Synced.*change.*"
+    timeout: 20000
+- takeScreenshot: android-sync-recovered

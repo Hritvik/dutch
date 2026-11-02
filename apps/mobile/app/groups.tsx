@@ -5,6 +5,9 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import { createAppConfig } from '../src/app-config';
 import { sessionStore } from '../src/expo-session-store';
 import { fetchGroups, type GroupView } from '../src/groups-client';
+import { fetchMemberProfile } from '../src/profile-client';
+import { activeMember } from '../src/projection-db';
+import { cachedGroups, syncProjection } from '../src/sync-coordinator';
 
 const config = createAppConfig(process.env);
 
@@ -12,6 +15,7 @@ export default function GroupsScreen() {
   const router = useRouter();
   const [groups, setGroups] = useState<GroupView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -22,7 +26,27 @@ export default function GroupsScreen() {
         setGroups([]);
         return;
       }
-      setGroups(await fetchGroups(config.apiBaseUrl, material.accessToken));
+      let memberId: string | null = null;
+      try {
+        memberId = (await fetchMemberProfile(config.apiBaseUrl, material.accessToken))?.memberId ?? null;
+      } catch {
+        memberId = await activeMember();
+      }
+      if (memberId) {
+        const outcome = await syncProjection(
+          config.apiBaseUrl, material.accessToken, memberId);
+        setOffline(outcome.mode === 'offline');
+      }
+      try {
+        setGroups(await fetchGroups(config.apiBaseUrl, material.accessToken));
+      } catch {
+        const cached = memberId ? await cachedGroups(memberId) : [];
+        setOffline(true);
+        if (cached.length === 0) {
+          setError('We could not load your groups and no cached copy is available.');
+        }
+        setGroups(cached);
+      }
     } catch {
       setError('We could not load your groups. Try again.');
       setGroups([]);
@@ -48,6 +72,9 @@ export default function GroupsScreen() {
       <Text style={styles.body}>
         Balances stay separate per group and currency. Archived groups remain readable.
       </Text>
+      {offline ? (
+        <Text style={styles.offline}>Offline · showing the last cached projection</Text>
+      ) : null}
 
       <Pressable
         accessibilityRole="button"
@@ -118,6 +145,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: ACCENT, fontSize: 12, fontWeight: '700', letterSpacing: 1.6, textTransform: 'uppercase' },
   title: { color: INK, fontSize: 30, fontWeight: '600', letterSpacing: -0.6, lineHeight: 36, marginTop: 18 },
   body: { color: MUTED, fontSize: 14, lineHeight: 21, marginTop: 10 },
+  offline: { color: '#8a3b2a', fontSize: 13, marginTop: 10 },
   centered: { alignItems: 'center', marginTop: 40 },
   muted: { color: MUTED, fontSize: 13, marginTop: 8 },
   notice: { color: '#8a3b2a', fontSize: 13, lineHeight: 19 },

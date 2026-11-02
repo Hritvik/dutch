@@ -17,6 +17,8 @@ import {
   type ProfileStateResult
 } from '../src/profile-client';
 import { initialSessionState, reduceSessionState, type SessionState } from '../src/session-state';
+import { wipeProjection } from '../src/projection-db';
+import { syncProjection } from '../src/sync-coordinator';
 import { createDevAccessToken, readAppSubject } from '../src/token';
 
 const config = createAppConfig(process.env);
@@ -36,6 +38,7 @@ export default function HomeScreen() {
   const [failure, setFailure] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   const accessToken = useRef<string | null>(null);
   const expectedSubject = useRef<string | null>(null);
 
@@ -45,6 +48,7 @@ export default function HomeScreen() {
 
   const expireSession = useCallback(async (reason: string) => {
     await sessionStore.wipe();
+    await wipeProjection();
     accessToken.current = null;
     expectedSubject.current = null;
     setProfile(undefined);
@@ -81,6 +85,11 @@ export default function HomeScreen() {
         identityId: subject,
         memberId: member.memberId
       }));
+      void syncProjection(config.apiBaseUrl, token, member.memberId)
+        .then((outcome) => setSyncStatus(outcome.mode === 'offline'
+          ? 'Offline · showing cached data'
+          : `Synced ${outcome.changes} change${outcome.changes === 1 ? '' : 's'}`))
+        .catch(() => setSyncStatus('Cached data may be out of date'));
     } catch (error) {
       if (error instanceof ProfileHttpError && (error.status === 401 || error.status === 403)) {
         await expireSession('Your session expired. Sign in again.');
@@ -191,6 +200,7 @@ export default function HomeScreen() {
 
   const signOut = useCallback(async () => {
     await sessionStore.wipe();
+    await wipeProjection();
     accessToken.current = null;
     expectedSubject.current = null;
     setProfile(undefined);
@@ -250,6 +260,7 @@ export default function HomeScreen() {
           ledgerAvailable={session.ledgerAvailable}
           onOpenGroups={() => router.push('/groups')}
           onOpenDirect={() => router.push('/direct/new')}
+          syncStatus={syncStatus}
           onSignOut={signOut}
         />
       ) : null}
@@ -395,12 +406,14 @@ function Home({
   ledgerAvailable,
   onOpenGroups,
   onOpenDirect,
+  syncStatus,
   onSignOut
 }: {
   memberId: string;
   ledgerAvailable: boolean;
   onOpenGroups: () => void;
   onOpenDirect: () => void;
+  syncStatus: string | null;
   onSignOut: () => void;
 }) {
   return (
@@ -426,8 +439,9 @@ function Home({
         <Text style={styles.quietLabel}>Direct expense</Text>
       </Pressable>
       <Text style={styles.body}>
-        Groups and one-off Direct Expenses are available. Recurring Series arrive next.
+        Groups, one-off Direct Expenses, and recurring Series are available.
       </Text>
+      {syncStatus ? <Text style={styles.muted}>{syncStatus}</Text> : null}
     </View>
   );
 }

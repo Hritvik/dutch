@@ -1,0 +1,14 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- extendedWaitUntil:
+    visible: "Flat 12"
+    timeout: 10000
+- takeScreenshot: android-online-groups

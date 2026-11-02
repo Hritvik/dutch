@@ -34,6 +34,7 @@ import {
   type CorrectionDraft
 } from '../../src/drafts';
 import { fetchGroup, type GroupView } from '../../src/groups-client';
+import { deleteDraft, loadDraft, saveDraft } from '../../src/projection-db';
 import { fetchMemberProfile } from '../../src/profile-client';
 
 const config = createAppConfig(process.env);
@@ -54,6 +55,7 @@ export default function NewExpenseScreen() {
   const [correctionStep, setCorrectionStep] = useState<'edit' | 'review'>('edit');
   const [correcting, setCorrecting] = useState(false);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const draftLoaded = useRef(false);
   const idempotencyKey = useRef<string | null>(null);
   const occurredAt = useRef<string | null>(null);
 
@@ -117,6 +119,29 @@ export default function NewExpenseScreen() {
     }
   }, [amount, description, group, groupId, memberId, token]);
 
+  useEffect(() => {
+    if (!memberId || !result || draftLoaded.current) return;
+    draftLoaded.current = true;
+    void (async () => {
+      const saved = await loadDraft<{ amount: string }>(memberId, `correction:${result.id}`);
+      if (saved?.amount) {
+        setCorrectionAmount(saved.amount);
+        setDraft(createCorrectionDraft({
+          expenseId: result.id,
+          groupId: result.groupId,
+          baseRevision: result.revision,
+          description: result.description,
+          totalMinorUnits: result.totalMinorUnits
+        }));
+      }
+    })();
+  }, [memberId, result]);
+
+  useEffect(() => {
+    if (!memberId || !result || !draft || draft.state === 'accepted') return;
+    void saveDraft(memberId, `correction:${result.id}`, { amount: correctionAmount });
+  }, [correctionAmount, draft, memberId, result]);
+
   const startCorrection = useCallback(() => {
     if (!result) return;
     setCorrectionError(null);
@@ -177,6 +202,7 @@ export default function NewExpenseScreen() {
       );
       setResult(corrected);
       setDraft(acceptCorrection(submitting));
+      await deleteDraft(memberId, `correction:${corrected.id}`);
       setCorrectionStep('edit');
       setCorrectionError(null);
     } catch (failure) {

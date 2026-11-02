@@ -1,0 +1,6 @@
+appId: com.dutch.mobile
+---
+- assertVisible: "You are signed in."
+- tapOn: "Sign out"
+- assertVisible: "Share costs without losing the plot."
+- takeScreenshot: android-signed-out

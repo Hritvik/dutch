@@ -1,0 +1,11 @@
+appId: com.dutch.mobile
+---
+- assertVisible: "Your groups."
+- tapOn: "Back"
+- assertVisible: "You are signed in."
+- tapOn: "View groups"
+- extendedWaitUntil:
+    visible: ".*Offline .* cached projection.*"
+    timeout: 15000
+- assertVisible: "Flat 12"
+- takeScreenshot: android-offline-groups

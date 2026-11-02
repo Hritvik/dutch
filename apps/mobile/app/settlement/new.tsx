@@ -31,7 +31,8 @@ export default function NewSettlementScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
   const [group, setGroup] = useState<GroupView | null>(null);
-  const [memberId, setMemberId] = useState<string | null>(null);
+  const [accountMemberId, setAccountMemberId] = useState<string | null>(null);
+  const [payerId, setPayerId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [payeeId, setPayeeId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
@@ -59,7 +60,8 @@ export default function NewSettlementScreen() {
         if (cancelled) return;
         setToken(material.accessToken);
         setGroup(loaded);
-        setMemberId(profile?.memberId ?? null);
+        setAccountMemberId(profile?.memberId ?? null);
+        setPayerId(profile?.memberId ?? null);
         const other = loaded.memberships.find(
           (membership) => membership.state === 'ACTIVE'
             && membership.memberId !== profile?.memberId);
@@ -74,25 +76,25 @@ export default function NewSettlementScreen() {
   }, [groupId]);
 
   useEffect(() => {
-    if (!memberId || draftLoaded.current) return;
+    if (!accountMemberId || draftLoaded.current) return;
     draftLoaded.current = true;
     void (async () => {
       const draft = await loadDraft<{
         payerId: string | null; payeeId: string | null; amount: string;
-      }>(memberId, 'settlement');
+      }>(accountMemberId, `settlement:${groupId}`);
       if (!draft) return;
-      if (draft.payerId) setMemberId(draft.payerId);
+      if (draft.payerId) setPayerId(draft.payerId);
       if (draft.payeeId) setPayeeId(draft.payeeId);
       setAmount(draft.amount);
     })();
-  }, [memberId]);
+  }, [accountMemberId, groupId]);
 
   useEffect(() => {
-    if (!memberId || !draftLoaded.current) return;
-    void saveDraft(memberId, 'settlement', {
-      payerId: memberId, payeeId, amount
+    if (!accountMemberId || !draftLoaded.current) return;
+    void saveDraft(accountMemberId, `settlement:${groupId}`, {
+      payerId, payeeId, amount
     });
-  }, [amount, memberId, payeeId]);
+  }, [accountMemberId, amount, groupId, payeeId, payerId]);
 
   const activeMembers = group?.memberships.filter(
     (membership) => membership.state === 'ACTIVE') ?? [];
@@ -108,20 +110,20 @@ export default function NewSettlementScreen() {
 
   const review = useCallback(() => {
     setError(null);
-    if (!payeeId || !memberId) {
+    if (!payeeId || !payerId) {
       setError('Choose who paid and who received the money.');
       return;
     }
-    if (payeeId === memberId) {
+    if (payeeId === payerId) {
       setError('A settlement needs two different members.');
       return;
     }
     if (reviewed() === null) return;
     setStep('review');
-  }, [memberId, payeeId, reviewed]);
+  }, [payerId, payeeId, reviewed]);
 
   const submit = useCallback(async () => {
-    if (!token || !group || !memberId || !payeeId) return;
+    if (!token || !group || !payerId || !payeeId) return;
     const totalMinorUnits = reviewed();
     if (totalMinorUnits === null) return;
     setBusy(true);
@@ -134,7 +136,7 @@ export default function NewSettlementScreen() {
     }
     try {
       const recorded = await recordSettlement(config.apiBaseUrl, token, group.id, key, {
-        payerMemberId: memberId,
+        payerMemberId: payerId,
         payeeMemberId: payeeId,
         totalMinorUnits,
         currency: group.currency,
@@ -142,7 +144,7 @@ export default function NewSettlementScreen() {
       });
       setResult(recorded);
       setStep('result');
-      await deleteDraft(memberId, 'settlement');
+      await deleteDraft(accountMemberId ?? payerId, `settlement:${groupId}`);
     } catch (failure) {
       // Keep the key and occurredAt: an ambiguous failure must replay the same
       // command rather than record a second settlement.
@@ -158,7 +160,7 @@ export default function NewSettlementScreen() {
     } finally {
       setBusy(false);
     }
-  }, [group, memberId, payeeId, reviewed, token]);
+  }, [accountMemberId, group, groupId, payeeId, payerId, reviewed, token]);
 
   const voidIt = useCallback(async () => {
     if (!token || !group || !result) return;
@@ -251,7 +253,7 @@ export default function NewSettlementScreen() {
           <Text style={styles.sectionLabel}>Scope</Text>
           <Text style={styles.cardValue}>{group.name} · {group.currency}</Text>
           <Text style={styles.sectionLabel}>From</Text>
-          <Text style={styles.cardValue}>{shortId(memberId ?? '')}</Text>
+          <Text style={styles.cardValue}>{shortId(payerId ?? '')}</Text>
           <Text style={styles.sectionLabel}>To</Text>
           <Text style={styles.cardValue}>{shortId(payeeId ?? '')}</Text>
           <Text style={styles.muted}>
@@ -297,14 +299,14 @@ export default function NewSettlementScreen() {
             key={membership.memberId}
             accessibilityRole="button"
             onPress={() => {
-              if (membership.memberId === memberId) return;
-              setMemberId(membership.memberId);
+              if (membership.memberId === payerId) return;
+              setPayerId(membership.memberId);
               idempotencyKey.current = null;
               occurredAt.current = null;
             }}
-            style={[styles.choice, membership.memberId === memberId ? styles.choiceOn : null]}
+            style={[styles.choice, membership.memberId === payerId ? styles.choiceOn : null]}
           >
-            <Text style={membership.memberId === memberId ? styles.choiceLabelOn : styles.choiceLabel}>
+            <Text style={membership.memberId === payerId ? styles.choiceLabelOn : styles.choiceLabel}>
               {shortId(membership.memberId)}
             </Text>
           </Pressable>
@@ -353,7 +355,7 @@ export default function NewSettlementScreen() {
 
       <Pressable
         accessibilityRole="button"
-        disabled={busy || !token || !memberId || !payeeId}
+        disabled={busy || !token || !payerId || !payeeId}
         onPress={review}
         style={styles.primary}
       >

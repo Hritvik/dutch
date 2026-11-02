@@ -144,6 +144,22 @@ test('publishes the Direct Expense and Series command surface', async () => {
     '#/components/schemas/DirectExpenseResponse');
 });
 
+test('validates the S5 Direct Expense, Series, occurrence, and sync fixtures', async () => {
+  const cases = [
+    ['DirectExpenseResponse', 'direct-expense-response.json'],
+    ['SeriesResponse', 'series-response-direct.json'],
+    ['OccurrenceResponse', 'occurrence-response.json'],
+    ['SyncPageResponse', 'sync-page-response.json']
+  ];
+  for (const [schema, file] of cases) {
+    const fixture = JSON.parse(await readFile(
+      path.join(contractsRoot, 'http/fixtures/ledger', file), 'utf8'));
+    const result = await validateHttpFixture(
+      contractsRoot, schema, fixture, 'http/ledger/openapi.yaml');
+    assert.equal(result.valid, true, `${schema}: ${result.issues.join('; ')}`);
+  }
+});
+
 test('requires the split-specific input in the expense contract', async () => {
   const fixture = JSON.parse(await readFile(
     path.join(contractsRoot, 'http/fixtures/ledger/create-expense-exact.json'), 'utf8'));

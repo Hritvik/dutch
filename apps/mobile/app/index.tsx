@@ -18,6 +18,7 @@ import {
 } from '../src/profile-client';
 import { initialSessionState, reduceSessionState, type SessionState } from '../src/session-state';
 import { wipeProjection } from '../src/projection-db';
+import { sqliteStore } from '../src/offline-store';
 import { syncProjection } from '../src/sync-coordinator';
 import { createDevAccessToken, readAppSubject } from '../src/token';
 
@@ -85,7 +86,7 @@ export default function HomeScreen() {
         identityId: subject,
         memberId: member.memberId
       }));
-      void syncProjection(config.apiBaseUrl, token, member.memberId)
+      void syncProjection(config.apiBaseUrl, token, member.memberId, subject, fetch, sqliteStore)
         .then((outcome) => setSyncStatus(outcome.mode === 'offline'
           ? 'Offline · showing cached data'
           : `Synced ${outcome.changes} change${outcome.changes === 1 ? '' : 's'}`))

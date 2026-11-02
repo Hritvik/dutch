@@ -1,0 +1,26 @@
+{
+  "data": {
+    "id": "exp_012345678901234567",
+    "description": "Dinner",
+    "totalMinorUnits": 100,
+    "currency": "INR",
+    "splitMethod": "EQUAL",
+    "payers": [{ "memberId": "mem_012345678901234567", "minorUnits": 100 }],
+    "shares": [
+      { "memberId": "mem_012345678901234567", "minorUnits": 50 },
+      { "memberId": "mem_112345678901234567", "minorUnits": 50 }
+    ],
+    "entries": [{
+      "expenseId": "exp_012345678901234567",
+      "revision": 1,
+      "debtor": "mem_112345678901234567",
+      "creditor": "mem_012345678901234567",
+      "minorUnits": 50,
+      "currency": "INR",
+      "algorithmVersion": "expense-allocation-v1"
+    }],
+    "streamIds": ["direct:mem_012345678901234567:mem_112345678901234567:INR"],
+    "occurredAt": "2026-11-02T00:00:00Z",
+    "revision": 1
+  }
+}

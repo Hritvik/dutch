@@ -1398,6 +1398,7 @@ components:
             - ACTIVITY
             - SERIES
             - OCCURRENCE
+            - ACCESS
         resourceId:
           type: string
           minLength: 1
@@ -1501,7 +1502,9 @@ components:
             - GROUP
             - DIRECT
         groupId:
-          $ref: "#/components/schemas/GroupId"
+          anyOf:
+            - $ref: "#/components/schemas/GroupId"
+            - type: "null"
         memberIds:
           type: array
           maxItems: 100
@@ -1615,6 +1618,7 @@ components:
           type: integer
           minimum: 1
           maximum: 31
+          description: Monthly accepts 1-31 (clamped to the month); weekly accepts 1-7.
         timezone:
           type: string
           minLength: 1
@@ -1748,7 +1752,6 @@ components:
             - PENDING
             - SUBMITTED
             - SKIPPED
-            - MISSED
         expenseId:
           type:
             - string

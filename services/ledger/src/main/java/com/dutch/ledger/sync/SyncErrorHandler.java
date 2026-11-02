@@ -1,5 +1,7 @@
 package com.dutch.ledger.sync;
 
+import com.dutch.ledger.group.GroupAccessDeniedException;
+import com.dutch.ledger.web.CorrelationIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -22,12 +24,21 @@ public class SyncErrorHandler {
         return error(request, HttpStatus.BAD_REQUEST, "invalid_request", "Request is invalid");
     }
 
+    @ExceptionHandler(GroupAccessDeniedException.class)
+    ResponseEntity<Map<String, Object>> notFound(HttpServletRequest request) {
+        return error(request, HttpStatus.NOT_FOUND, "not_found", "Resource was not found");
+    }
+
     private ResponseEntity<Map<String, Object>> error(HttpServletRequest request, HttpStatus status,
                                                       String code, String message) {
         Map<String, Object> error = new LinkedHashMap<>();
         error.put("code", code);
         error.put("message", message);
-        error.put("correlationId", String.valueOf(request.getAttribute("correlationId")));
+        String correlationId = (String) request.getAttribute(CorrelationIdFilter.ATTRIBUTE);
+        if (correlationId == null) {
+            correlationId = CorrelationIdFilter.resolve(request.getHeader(CorrelationIdFilter.HEADER));
+        }
+        error.put("correlationId", correlationId);
         return ResponseEntity.status(status).body(Map.of("error", error));
     }
 }

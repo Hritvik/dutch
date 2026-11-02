@@ -1,12 +1,6 @@
-import { parseGroupView, type GroupView } from './groups-client';
 import {
-  applySnapshotPage,
-  applySyncPage,
-  readCursor,
-  readResources,
-  setActiveMember
-} from './projection-db';
-import {
+  type SyncChange,
+  type SyncPage,
   SyncContractError,
   SyncHttpError,
   createSyncSnapshot,
@@ -25,28 +19,57 @@ export type SyncOutcome = {
 const PAGE_LIMIT = 100;
 const CATCH_UP_PAGES = 3;
 
+export type SyncStore = {
+  setActiveMember: (memberId: string, identityId?: string) => Promise<void>;
+  readCursor: (memberId: string) => Promise<string | null>;
+  applyPage: (memberId: string, page: SyncPage) => Promise<void>;
+  applySnapshot: (memberId: string, changes: SyncChange[], cursor: string) => Promise<void>;
+};
+
 /**
  * One single-flight caller is expected (the app shell). A missing or expired
  * cursor falls back to a recipient-bound snapshot, then catches up.
  */
-export async function syncProjection(
+let inflight: Promise<SyncOutcome> | null = null;
+
+/** Single-flight: concurrent app-shell callers share one sync run. */
+export function syncProjection(
   baseUrl: string,
   accessToken: string,
   memberId: string,
-  fetchImpl: ApiFetch = fetch
+  identityId: string | undefined,
+  fetchImpl: ApiFetch,
+  store: SyncStore
 ): Promise<SyncOutcome> {
-  await setActiveMember(memberId);
+  if (inflight) {
+    return inflight;
+  }
+  inflight = runSync(baseUrl, accessToken, memberId, identityId, fetchImpl, store).finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
+
+async function runSync(
+  baseUrl: string,
+  accessToken: string,
+  memberId: string,
+  identityId: string | undefined,
+  fetchImpl: ApiFetch,
+  store: SyncStore
+): Promise<SyncOutcome> {
+  await store.setActiveMember(memberId, identityId);
   try {
-    const cursor = await readCursor(memberId);
+    const cursor = await store.readCursor(memberId);
     if (!cursor) {
-      return await fullSync(baseUrl, accessToken, memberId, fetchImpl);
+      return await fullSync(baseUrl, accessToken, memberId, fetchImpl, store);
     }
     const page = await fetchSyncPage(baseUrl, accessToken, cursor, PAGE_LIMIT, fetchImpl);
-    await applySyncPage(memberId, page);
+    await store.applyPage(memberId, page);
     return { mode: 'incremental', changes: page.changes.length };
   } catch (failure) {
     if (failure instanceof SyncHttpError && failure.code === 'sync_cursor_expired') {
-      return await fullSync(baseUrl, accessToken, memberId, fetchImpl);
+      return await fullSync(baseUrl, accessToken, memberId, fetchImpl, store);
     }
     if (failure instanceof SyncContractError) {
       throw failure;
@@ -59,17 +82,18 @@ async function fullSync(
   baseUrl: string,
   accessToken: string,
   memberId: string,
-  fetchImpl: ApiFetch
+  fetchImpl: ApiFetch,
+  store: SyncStore
 ): Promise<SyncOutcome> {
   try {
     const snapshot = await createSyncSnapshot(baseUrl, accessToken, fetchImpl);
     const page = await readSyncSnapshot(baseUrl, accessToken, snapshot.token, fetchImpl);
-    await applySnapshotPage(memberId, page.changes, page.cursor);
+    await store.applySnapshot(memberId, page.changes, page.cursor);
     let changes = page.changes.length;
     let cursor = page.cursor;
     for (let attempt = 0; attempt < CATCH_UP_PAGES; attempt++) {
       const incremental = await fetchSyncPage(baseUrl, accessToken, cursor, PAGE_LIMIT, fetchImpl);
-      await applySyncPage(memberId, incremental);
+      await store.applyPage(memberId, incremental);
       changes += incremental.changes.length;
       cursor = incremental.nextCursor;
       if (incremental.changes.length < PAGE_LIMIT) {
@@ -83,18 +107,4 @@ async function fullSync(
     }
     return { mode: 'offline', changes: 0 };
   }
-}
-
-/** Authorized Group projections from the durable cache, newest server state only. */
-export async function cachedGroups(memberId: string): Promise<GroupView[]> {
-  const rows = await readResources(memberId, 'GROUP');
-  const groups: GroupView[] = [];
-  for (const row of rows) {
-    try {
-      groups.push(parseGroupView(row.payload));
-    } catch {
-      // A malformed cached row must never be shown as authoritative state.
-    }
-  }
-  return groups.sort((left, right) => left.name.localeCompare(right.name));
 }

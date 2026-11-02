@@ -57,20 +57,33 @@ async function database(): Promise<SQLite.SQLiteDatabase> {
   return opening;
 }
 
-export async function setActiveMember(memberId: string): Promise<void> {
+export async function setActiveMember(
+  memberId: string,
+  identityId?: string
+): Promise<void> {
   const db = await database();
-  const row = await db.getFirstAsync<{ value: string }>(
+  const memberRow = await db.getFirstAsync<{ value: string }>(
     'SELECT value FROM meta WHERE key = ?', 'active_member');
-  if (row?.value === memberId) {
+  const identityRow = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM meta WHERE key = ?', 'active_identity');
+  const memberChanged = memberRow !== null && memberRow.value !== memberId;
+  const identityChanged = identityId !== undefined && identityRow !== null
+    && identityRow.value !== identityId;
+  if (!memberChanged && !identityChanged && memberRow?.value === memberId) {
     return;
   }
-  await db.withTransactionAsync(async () => {
+  await db.withExclusiveTransactionAsync(async (txn) => {
     for (const table of ['resources', 'tombstones', 'drafts', 'cursors']) {
-      await db.runAsync(`DELETE FROM ${table}`);
+      await txn.runAsync(`DELETE FROM ${table}`);
     }
-    await db.runAsync(
+    await txn.runAsync(
       'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?',
       'active_member', memberId, memberId);
+    if (identityId !== undefined) {
+      await txn.runAsync(
+        'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?',
+        'active_identity', identityId, identityId);
+    }
   });
 }
 
@@ -83,9 +96,9 @@ export async function activeMember(): Promise<string | null> {
 
 export async function wipeProjection(): Promise<void> {
   const db = await database();
-  await db.withTransactionAsync(async () => {
+  await db.withExclusiveTransactionAsync(async (txn) => {
     for (const table of ['resources', 'tombstones', 'drafts', 'cursors', 'meta']) {
-      await db.runAsync(`DELETE FROM ${table}`);
+      await txn.runAsync(`DELETE FROM ${table}`);
     }
   });
 }
@@ -99,9 +112,9 @@ export async function readCursor(memberId: string): Promise<string | null> {
 
 export async function applySyncPage(memberId: string, page: SyncPage): Promise<void> {
   const db = await database();
-  await db.withTransactionAsync(async () => {
-    await applyChanges(db, memberId, page.changes);
-    await db.runAsync(
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await applyChanges(txn, memberId, page.changes);
+    await txn.runAsync(
       `INSERT INTO cursors (scope, cursor, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(scope) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`,
       memberId, page.nextCursor, new Date().toISOString());
@@ -114,11 +127,11 @@ export async function applySnapshotPage(
   cursor: string
 ): Promise<void> {
   const db = await database();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync('DELETE FROM resources WHERE scope = ?', memberId);
-    await db.runAsync('DELETE FROM tombstones WHERE scope = ?', memberId);
-    await applyChanges(db, memberId, changes);
-    await db.runAsync(
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync('DELETE FROM resources WHERE scope = ?', memberId);
+    await txn.runAsync('DELETE FROM tombstones WHERE scope = ?', memberId);
+    await applyChanges(txn, memberId, changes);
+    await txn.runAsync(
       `INSERT INTO cursors (scope, cursor, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(scope) DO UPDATE SET cursor = excluded.cursor, updated_at = excluded.updated_at`,
       memberId, cursor, new Date().toISOString());

@@ -109,7 +109,7 @@ public class CorrectionService {
 
         ExpenseView view = ExpenseView.from(replacement);
         journal.append(group.memberships().stream()
-                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "EXPENSE", replacement.id().value(), "upsert", replacement.revision(),
                 objectMapper.convertValue(view, java.util.Map.class), null, now);

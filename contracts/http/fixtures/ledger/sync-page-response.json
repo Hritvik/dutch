@@ -1,0 +1,15 @@
+{
+  "data": {
+    "changes": [{
+      "sequence": 1,
+      "resourceType": "GROUP",
+      "resourceId": "grp_012345678901234567",
+      "operation": "upsert",
+      "resourceVersion": 1,
+      "payload": { "id": "grp_012345678901234567" },
+      "schemaVersion": "1",
+      "occurredAt": "2026-11-02T00:00:00Z"
+    }],
+    "nextCursor": "v1.cursor"
+  }
+}

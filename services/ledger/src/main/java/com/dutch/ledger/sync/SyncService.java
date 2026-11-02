@@ -46,7 +46,7 @@ public class SyncService {
     public SyncViews.SnapshotPage readSnapshot(String appSubject, String token) {
         MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
         long asOf = codec.verifySnapshot(token, actor);
-        List<SyncChange> changes = journal.snapshot(actor);
+        List<SyncChange> changes = journal.snapshot(actor, asOf, 1000);
         return new SyncViews.SnapshotPage(changes.stream().map(SyncViews.Change::from).toList(),
                 codec.sign(actor, asOf), asOf);
     }

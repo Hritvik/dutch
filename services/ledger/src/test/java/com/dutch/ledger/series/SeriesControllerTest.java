@@ -178,6 +178,46 @@ class SeriesControllerTest {
     }
 
     @Test
+    void an_inactive_member_keeps_read_access_but_cannot_change_a_series() throws Exception {
+        String groupId = createGroup();
+        String seriesId = createSeries(groupId);
+        String occurrenceId = generate(groupId, seriesId);
+
+        String groupBody = mockMvc.perform(get("/api/v1/groups/" + groupId).with(as(ADMIN_SUBJECT)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Integer groupVersion = JsonPath.read(groupBody, "$.data.version");
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/v1/groups/" + groupId + "/members/" + MEMBER.value())
+                        .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"" + groupVersion + "\""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/series/" + seriesId).with(as(MEMBER_SUBJECT)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/series/" + seriesId + "/occurrences")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("Idempotency-Key", "inactive-generate-" + UUID.randomUUID())
+                        .header("If-Match", "\"2\""))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("forbidden"));
+
+        mockMvc.perform(post("/api/v1/series/occurrences/" + occurrenceId + "/skip")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("Idempotency-Key", "inactive-skip-" + UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/series/" + seriesId + "/status")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("Idempotency-Key", "inactive-status-" + UUID.randomUUID())
+                        .header("If-Match", "\"2\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"PAUSE\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void a_non_member_cannot_read_or_create_a_group_series() throws Exception {
         String groupId = createGroup();
         String seriesId = createSeries(groupId);

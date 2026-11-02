@@ -22,16 +22,30 @@ public class SyncCursorCodec {
 
     private final byte[] secret;
     private final java.time.Clock clock;
+    private final String keyId;
+    private final String feedGeneration;
 
     @org.springframework.beans.factory.annotation.Autowired
     public SyncCursorCodec(
-            @Value("${dutch.sync.cursor-secret:dev-sync-cursor-secret-change-me}") String secret) {
-        this(secret, java.time.Clock.systemUTC());
+            @Value("${dutch.sync.cursor-secret:dev-sync-cursor-secret-change-me}") String secret,
+            @Value("${dutch.sync.cursor-key-id:dev}") String keyId,
+            @Value("${dutch.sync.feed-generation:1}") String feedGeneration) {
+        this(secret, java.time.Clock.systemUTC(), keyId, feedGeneration);
+    }
+
+    SyncCursorCodec(String secret) {
+        this(secret, java.time.Clock.systemUTC(), "dev", "1");
     }
 
     SyncCursorCodec(String secret, java.time.Clock clock) {
+        this(secret, clock, "dev", "1");
+    }
+
+    SyncCursorCodec(String secret, java.time.Clock clock, String keyId, String feedGeneration) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
         this.clock = clock;
+        this.keyId = keyId;
+        this.feedGeneration = feedGeneration;
     }
 
     public String sign(MemberId recipient, long sequence) {
@@ -52,8 +66,9 @@ public class SyncCursorCodec {
     }
 
     private String sign(String kind, MemberId recipient, long sequence, Instant expiry) {
-        String payload = kind + "." + recipient.value() + "." + sequence + "."
-                + Instant.now(clock).getEpochSecond() + "." + expiry.getEpochSecond();
+        String payload = kind + "." + keyId + "." + feedGeneration + "." + feedId(recipient)
+                + "." + sequence + "." + Instant.now(clock).getEpochSecond()
+                + "." + expiry.getEpochSecond();
         return payload + "." + encode(hmac(payload));
     }
 
@@ -62,14 +77,17 @@ public class SyncCursorCodec {
             throw new SyncCursorExpiredException();
         }
         String[] parts = token.split("\\.");
-        if (parts.length != 6 || !parts[0].equals(kind) || !parts[1].equals(recipient.value())) {
+        if (parts.length != 8 || !parts[0].equals(kind)
+                || !parts[1].equals(keyId) || !parts[2].equals(feedGeneration)
+                || !parts[3].equals(feedId(recipient))) {
             throw new SyncCursorExpiredException();
         }
-        String payload = String.join(".", parts[0], parts[1], parts[2], parts[3], parts[4]);
+        String payload = String.join(".", parts[0], parts[1], parts[2], parts[3], parts[4],
+                parts[5], parts[6]);
         byte[] expected = hmac(payload);
         byte[] actual;
         try {
-            actual = Base64.getUrlDecoder().decode(parts[5]);
+            actual = Base64.getUrlDecoder().decode(parts[7]);
         } catch (IllegalArgumentException exception) {
             throw new SyncCursorExpiredException(exception);
         }
@@ -77,14 +95,25 @@ public class SyncCursorCodec {
             throw new SyncCursorExpiredException();
         }
         try {
-            long sequence = Long.parseLong(parts[2]);
-            long expiry = Long.parseLong(parts[4]);
+            long sequence = Long.parseLong(parts[4]);
+            long expiry = Long.parseLong(parts[6]);
             if (sequence < 0 || expiry < Instant.now(clock).getEpochSecond()) {
                 throw new SyncCursorExpiredException();
             }
             return new Token(sequence);
         } catch (NumberFormatException exception) {
             throw new SyncCursorExpiredException(exception);
+        }
+    }
+
+    /** An opaque feed id avoids writing the raw Member id into client-visible tokens. */
+    private String feedId(MemberId recipient) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(recipient.value().getBytes(StandardCharsets.UTF_8));
+            return encode(java.util.Arrays.copyOf(digest, 12));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 

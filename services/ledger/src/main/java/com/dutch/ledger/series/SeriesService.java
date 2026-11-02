@@ -120,7 +120,7 @@ public class SeriesService {
     @Transactional(readOnly = true)
     public SeriesView read(String appSubject, String seriesId) {
         MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
-        RecurringSeries found = authorized(actor, new SeriesId(seriesId));
+        RecurringSeries found = authorizedReader(actor, new SeriesId(seriesId));
         return SeriesView.from(found);
     }
 
@@ -143,7 +143,7 @@ public class SeriesService {
     @Transactional(readOnly = true)
     public List<OccurrenceView> occurrences(String appSubject, String seriesId) {
         MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
-        RecurringSeries found = authorized(actor, new SeriesId(seriesId));
+        RecurringSeries found = authorizedReader(actor, new SeriesId(seriesId));
         return series.occurrencesFor(found.id()).stream().map(OccurrenceView::from).toList();
     }
 
@@ -159,7 +159,7 @@ public class SeriesService {
             return replay(existing.get(), requestHash, OccurrenceView.class)
                     .orElseThrow(() -> new IllegalStateException("occurrence replay is empty"));
         }
-        RecurringSeries found = authorized(actor, new SeriesId(seriesId));
+        RecurringSeries found = authorizedWriter(actor, new SeriesId(seriesId));
         if (found.version() != expectedVersion) {
             throw new ConcurrentGroupUpdateException();
         }
@@ -178,6 +178,9 @@ public class SeriesService {
         RecurringSeries advanced = found.withNextPeriodStart(
                 found.cadence().nextPeriodStart(found.nextPeriodStart()));
         series.update(advanced, expectedVersion);
+        journal.append(recipients(advanced), "SERIES", advanced.id().value(), "upsert",
+                advanced.version(), objectMapper.convertValue(SeriesView.from(advanced), Map.class),
+                null, Instant.now());
         appendActivity(found, actor, ActivityAction.SERIES_OCCURRENCE_GENERATED, Map.of(
                 "periodStart", occurrence.periodStart().toString(),
                 "periodEnd", occurrence.periodEnd().toString(),
@@ -201,7 +204,7 @@ public class SeriesService {
                     .orElseThrow(() -> new IllegalStateException("occurrence replay is empty"));
         }
         PendingOccurrence occurrence = occurrence(occurrenceId);
-        RecurringSeries found = authorized(actor, occurrence.seriesId());
+        RecurringSeries found = authorizedWriter(actor, occurrence.seriesId());
         if (occurrence.status() != OccurrenceStatus.PENDING) {
             throw new GroupRuleException("This occurrence is no longer pending.");
         }
@@ -235,7 +238,7 @@ public class SeriesService {
                     .orElseThrow(() -> new IllegalStateException("occurrence replay is empty"));
         }
         PendingOccurrence occurrence = occurrence(occurrenceId);
-        RecurringSeries found = authorized(actor, occurrence.seriesId());
+        RecurringSeries found = authorizedWriter(actor, occurrence.seriesId());
         if (occurrence.status() != OccurrenceStatus.PENDING) {
             throw new GroupRuleException("This occurrence is no longer pending.");
         }
@@ -283,7 +286,7 @@ public class SeriesService {
             return replay(existing.get(), requestHash, SeriesView.class)
                     .orElseThrow(() -> new IllegalStateException("series replay is empty"));
         }
-        RecurringSeries found = authorized(actor, new SeriesId(seriesId));
+        RecurringSeries found = authorizedWriter(actor, new SeriesId(seriesId));
         if (found.version() != expectedVersion) {
             throw new ConcurrentGroupUpdateException();
         }
@@ -312,7 +315,7 @@ public class SeriesService {
         return view;
     }
 
-    private RecurringSeries authorized(MemberId actor, SeriesId id) {
+    private RecurringSeries authorizedReader(MemberId actor, SeriesId id) {
         RecurringSeries found = series.find(id).orElseThrow(GroupAccessDeniedException::new);
         if (found.scope().type() == SeriesScope.ScopeType.GROUP) {
             Group group = groups.findById(found.scope().groupId())
@@ -322,6 +325,19 @@ public class SeriesService {
             }
         } else if (!found.scope().memberIds().contains(actor)) {
             throw new GroupAccessDeniedException();
+        }
+        return found;
+    }
+
+    /** Inactive membership is read-only: series commands require collaboration. */
+    private RecurringSeries authorizedWriter(MemberId actor, SeriesId id) {
+        RecurringSeries found = authorizedReader(actor, id);
+        if (found.scope().type() == SeriesScope.ScopeType.GROUP) {
+            Group group = groups.findById(found.scope().groupId())
+                    .orElseThrow(GroupAccessDeniedException::new);
+            if (!group.canCollaborate(actor)) {
+                throw new GroupForbiddenException();
+            }
         }
         return found;
     }
@@ -446,7 +462,7 @@ public class SeriesService {
         }
         return groups.findById(found.scope().groupId())
                 .map(group -> group.memberships().stream()
-                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId)
                         .toList())
                 .orElse(List.of());

@@ -40,6 +40,19 @@ class SyncCursorCodecTest {
     }
 
     @Test
+    void the_key_id_and_feed_generation_are_bound_into_the_token() {
+        Clock clock = Clock.fixed(Instant.parse("2026-11-01T00:00:00Z"), ZoneOffset.UTC);
+        SyncCursorCodec first = new SyncCursorCodec("secret", clock, "key-1", "gen-1");
+        String cursor = first.sign(A, 3);
+        assertThat(cursor).doesNotContain(A.value());
+        assertThat(first.verify(cursor, A)).isEqualTo(3);
+        assertThatThrownBy(() -> new SyncCursorCodec("secret", clock, "key-2", "gen-1")
+                .verify(cursor, A)).isInstanceOf(SyncCursorExpiredException.class);
+        assertThatThrownBy(() -> new SyncCursorCodec("secret", clock, "key-1", "gen-2")
+                .verify(cursor, A)).isInstanceOf(SyncCursorExpiredException.class);
+    }
+
+    @Test
     void snapshot_tokens_are_separate_from_incremental_cursors() {
         SyncCursorCodec codec = new SyncCursorCodec("secret");
         assertThat(codec.verifySnapshot(codec.signSnapshot(A, 9), A)).isEqualTo(9);

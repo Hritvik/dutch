@@ -18,5 +18,5 @@ public interface SyncJournal {
     long maxSequence(MemberId recipient);
 
     /** Latest upsert per resource, excluding tombstones. */
-    List<SyncChange> snapshot(MemberId recipient);
+    List<SyncChange> snapshot(MemberId recipient, long asOfSequence, int limit);
 }

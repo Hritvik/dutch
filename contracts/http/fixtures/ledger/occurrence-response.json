@@ -1,0 +1,12 @@
+{
+  "data": {
+    "id": "occ_012345678901234567",
+    "seriesId": "ser_012345678901234567",
+    "templateVersion": 1,
+    "periodStart": "2026-11-01",
+    "periodEnd": "2026-11-30",
+    "dueAt": "2026-11-05T00:00:00Z",
+    "status": "PENDING",
+    "expenseId": null
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "data": {
+    "id": "ser_012345678901234567",
+    "scope": { "type": "DIRECT", "groupId": null, "memberIds": ["mem_012345678901234567", "mem_112345678901234567"] },
+    "description": "Rent",
+    "totalMinorUnits": 100,
+    "currency": "INR",
+    "splitMethod": "EQUAL",
+    "payers": [{ "memberId": "mem_012345678901234567", "minorUnits": 100 }],
+    "participants": [
+      { "memberId": "mem_012345678901234567", "basisPoints": null, "minorUnits": null },
+      { "memberId": "mem_112345678901234567", "basisPoints": null, "minorUnits": null }
+    ],
+    "cadence": "MONTHLY",
+    "dueDay": 5,
+    "timezone": "Asia/Kolkata",
+    "status": "ACTIVE",
+    "nextPeriodStart": "2026-11-01",
+    "version": 1
+  }
+}

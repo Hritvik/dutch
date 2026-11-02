@@ -15,7 +15,7 @@ import { sessionStore } from '../../src/expo-session-store';
 import { parseMajorToMinor } from '../../src/expenses-client';
 import { fetchGroup, type GroupView } from '../../src/groups-client';
 import { fetchMemberProfile } from '../../src/profile-client';
-import { createSeries, type SeriesView } from '../../src/series-client';
+import { SeriesHttpError, createSeries, type SeriesView } from '../../src/series-client';
 
 const config = createAppConfig(process.env);
 
@@ -88,8 +88,15 @@ export default function NewSeriesScreen() {
       });
       router.replace(`/series/${created.id}`);
     } catch (failure) {
-      key.current = null;
-      setError(failure instanceof Error ? failure.message : 'We could not create the Series.');
+      // A lost/5xx response must replay the same key; only a terminal 4xx resets it.
+      if (failure instanceof SeriesHttpError && failure.status >= 400 && failure.status < 500) {
+        key.current = null;
+      }
+      setError(failure instanceof SeriesHttpError && failure.code === 'idempotency_conflict'
+        ? 'This Series was already sent with different details. Review it again.'
+        : failure instanceof SeriesHttpError && failure.code === 'forbidden'
+          ? 'You do not have permission for that action.'
+          : 'We could not create the Series. Try again.');
     } finally {
       setBusy(false);
     }

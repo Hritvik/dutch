@@ -44,6 +44,7 @@ class DirectExpenseControllerTest {
 
     @Test
     void creates_a_direct_expense_with_its_canonical_pair_stream_and_activity() throws Exception {
+        createSharedGroup();
         String body = mockMvc.perform(post("/api/v1/direct-expenses")
                         .with(as(ADMIN_SUBJECT))
                         .header("Idempotency-Key", "direct-" + UUID.randomUUID())
@@ -70,6 +71,7 @@ class DirectExpenseControllerTest {
 
     @Test
     void replays_the_same_key_and_rejects_a_changed_payload() throws Exception {
+        createSharedGroup();
         String key = "direct-replay-" + UUID.randomUUID();
         String first = mockMvc.perform(post("/api/v1/direct-expenses")
                         .with(as(ADMIN_SUBJECT))
@@ -99,6 +101,7 @@ class DirectExpenseControllerTest {
 
     @Test
     void a_caller_outside_the_expense_and_an_unrelated_reader_are_rejected() throws Exception {
+        createSharedGroup();
         mockMvc.perform(post("/api/v1/direct-expenses")
                         .with(as(OUTSIDER_SUBJECT))
                         .header("Idempotency-Key", "direct-outsider-" + UUID.randomUUID())
@@ -131,6 +134,24 @@ class DirectExpenseControllerTest {
                         .content(directJson(100)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("invalid_request"));
+    }
+
+    private void createSharedGroup() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/groups").with(as(ADMIN_SUBJECT))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Shared flat\",\"currency\":\"INR\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String groupId = JsonPath.read(body, "$.data.id");
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members").with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + MEMBER.value() + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/" + MEMBER.value() + "/activate")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"1\""))
+                .andExpect(status().isOk());
     }
 
     private static String directJson(long total) {

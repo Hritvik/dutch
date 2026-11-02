@@ -132,7 +132,7 @@ public class GroupService {
             boolean wasActive = previous.membership(membership.memberId())
                     .map(Membership::isActive).orElse(false);
             if (wasActive && membership.state() == MembershipState.INACTIVE) {
-                journal.append(List.of(membership.memberId()), "GROUP", group.id().value(),
+                journal.append(List.of(membership.memberId()), "ACCESS", group.id().value(),
                         "access_changed", group.version(),
                         Map.of("groupId", group.id().value(), "access", "read"),
                         null, Instant.now());

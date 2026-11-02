@@ -7,7 +7,8 @@ import { sessionStore } from '../src/expo-session-store';
 import { fetchGroups, type GroupView } from '../src/groups-client';
 import { fetchMemberProfile } from '../src/profile-client';
 import { activeMember } from '../src/projection-db';
-import { cachedGroups, syncProjection } from '../src/sync-coordinator';
+import { cachedGroups, sqliteStore } from '../src/offline-store';
+import { syncProjection } from '../src/sync-coordinator';
 
 const config = createAppConfig(process.env);
 
@@ -34,7 +35,8 @@ export default function GroupsScreen() {
       }
       if (memberId) {
         const outcome = await syncProjection(
-          config.apiBaseUrl, material.accessToken, memberId);
+          config.apiBaseUrl, material.accessToken, memberId, material.identityId,
+          fetch, sqliteStore);
         setOffline(outcome.mode === 'offline');
       }
       try {

@@ -94,7 +94,7 @@ public class ExpenseService {
                 details));
         ExpenseView view = ExpenseView.from(expense);
         journal.append(group.memberships().stream()
-                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "EXPENSE", expense.id().value(), "upsert", expense.revision(),
                 objectMapper.convertValue(view, java.util.Map.class), null, now);

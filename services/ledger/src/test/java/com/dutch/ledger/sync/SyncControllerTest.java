@@ -132,7 +132,13 @@ class SyncControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.changes[?(@.resourceId == '" + groupId
                         + "' && @.operation == 'access_changed')].payload.access")
-                        .value(hasItem("read")));
+                        .value(hasItem("read")))
+                .andExpect(jsonPath("$.data.changes[?(@.resourceId == '" + groupId
+                        + "' && @.operation == 'access_changed')].resourceType")
+                        .value(hasItem("ACCESS")))
+                .andExpect(jsonPath("$.data.changes[?(@.resourceId == '" + groupId
+                        + "' && @.resourceType == 'GROUP')].operation")
+                        .value(hasItem("upsert")));
     }
 
     @Test

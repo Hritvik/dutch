@@ -13,9 +13,10 @@ import {
 import { createAppConfig } from '../../src/app-config';
 import { sessionStore } from '../../src/expo-session-store';
 import { createDirectExpense, type DirectExpenseView } from '../../src/direct-expenses-client';
-import { formatMinor, parseMajorToMinor } from '../../src/expenses-client';
+import { ExpenseHttpError, formatMinor, parseMajorToMinor } from '../../src/expenses-client';
 import { fetchGroups, type GroupView } from '../../src/groups-client';
 import { fetchMemberProfile } from '../../src/profile-client';
+import { deleteDraft, loadDraft, saveDraft } from '../../src/projection-db';
 
 const config = createAppConfig(process.env);
 
@@ -32,6 +33,7 @@ export default function NewDirectExpenseScreen() {
   const [result, setResult] = useState<DirectExpenseView | null>(null);
   const key = useRef<string | null>(null);
   const occurredAt = useRef<string | null>(null);
+  const draftLoaded = useRef(false);
 
   useEffect(() => {
     void (async () => {
@@ -54,6 +56,25 @@ export default function NewDirectExpenseScreen() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (!memberId || draftLoaded.current) return;
+    draftLoaded.current = true;
+    void (async () => {
+      const draft = await loadDraft<{
+        description: string; amount: string; otherId: string | null;
+      }>(memberId, 'direct-expense');
+      if (!draft) return;
+      setDescription(draft.description);
+      setAmount(draft.amount);
+      if (draft.otherId) setOtherId(draft.otherId);
+    })();
+  }, [memberId]);
+
+  useEffect(() => {
+    if (!memberId || !draftLoaded.current) return;
+    void saveDraft(memberId, 'direct-expense', { description, amount, otherId });
+  }, [amount, description, memberId, otherId]);
+
   const others = Array.from(new Set(
     groups.flatMap((group) => group.memberships
       .filter((membership) => membership.state === 'ACTIVE'
@@ -73,7 +94,7 @@ export default function NewDirectExpenseScreen() {
         key.current = commandKey;
         occurredAt.current = new Date().toISOString();
       }
-      setResult(await createDirectExpense(config.apiBaseUrl, token, commandKey, {
+      const created = await createDirectExpense(config.apiBaseUrl, token, commandKey, {
         description: description.trim(),
         totalMinorUnits: total,
         currency: groups[0]?.currency ?? 'INR',
@@ -81,9 +102,14 @@ export default function NewDirectExpenseScreen() {
         payers: [{ memberId, minorUnits: total }],
         participants: [memberId, otherId],
         occurredAt: occurredAt.current ?? new Date().toISOString()
-      }));
+      });
+      setResult(created);
+      await deleteDraft(memberId, 'direct-expense');
     } catch (failure) {
-      key.current = null;
+      // Keep the key on a lost/5xx response so the retry replays the command.
+      if (failure instanceof ExpenseHttpError && failure.status >= 400 && failure.status < 500) {
+        key.current = null;
+      }
       setError(failure instanceof Error ? failure.message : 'We could not record it.');
     } finally {
       setBusy(false);

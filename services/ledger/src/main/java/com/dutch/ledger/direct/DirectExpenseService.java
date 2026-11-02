@@ -12,6 +12,7 @@ import com.dutch.ledger.expense.IdempotencyStore;
 import com.dutch.ledger.expense.PayerContribution;
 import com.dutch.ledger.group.GroupAccessDeniedException;
 import com.dutch.ledger.group.GroupForbiddenException;
+import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.MemberDirectory;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
@@ -37,18 +38,20 @@ public class DirectExpenseService {
     private final DirectExpenseRepository expenses;
     private final MemberResolver members;
     private final MemberDirectory directory;
+    private final GroupRepository groups;
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
     private final SyncJournal journal;
     private final ObjectMapper objectMapper;
 
     public DirectExpenseService(DirectExpenseRepository expenses, MemberResolver members,
-                                MemberDirectory directory, IdempotencyStore idempotency,
-                                ActivityRepository activity, SyncJournal journal,
-                                ObjectMapper objectMapper) {
+                                MemberDirectory directory, GroupRepository groups,
+                                IdempotencyStore idempotency, ActivityRepository activity,
+                                SyncJournal journal, ObjectMapper objectMapper) {
         this.expenses = expenses;
         this.members = members;
         this.directory = directory;
+        this.groups = groups;
         this.idempotency = idempotency;
         this.activity = activity;
         this.journal = journal;
@@ -72,6 +75,9 @@ public class DirectExpenseService {
         for (MemberId member : involved) {
             if (!directory.isActive(member)) {
                 throw new IllegalArgumentException("every direct member must be active");
+            }
+            if (!member.equals(actor) && !sharesActiveGroup(actor, member)) {
+                throw new GroupForbiddenException();
             }
         }
 
@@ -106,7 +112,7 @@ public class DirectExpenseService {
                 expense.revision(), now, details));
 
         DirectExpenseView view = DirectExpenseView.from(expense);
-        journal.append(involved, "DIRECT_EXPENSE", expense.id().value(), "upsert",
+        journal.append(new java.util.TreeSet<>(involved), "DIRECT_EXPENSE", expense.id().value(), "upsert",
                 expense.revision(), objectMapper.convertValue(view, java.util.Map.class), null, now);
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;
@@ -132,6 +138,15 @@ public class DirectExpenseService {
             throw new GroupAccessDeniedException();
         }
         return activity.forScope(scopeId(expense));
+    }
+
+    /** A Direct Expense may only name members the caller currently collaborates with. */
+    private boolean sharesActiveGroup(MemberId actor, MemberId other) {
+        return groups.findReadableBy(actor).stream()
+                .filter(group -> group.canCollaborate(actor))
+                .anyMatch(group -> group.membership(other)
+                        .map(com.dutch.ledger.group.Membership::isActive)
+                        .orElse(false));
     }
 
     private DirectExpenseView replay(IdempotencyStore.Outcome outcome, String requestHash) {

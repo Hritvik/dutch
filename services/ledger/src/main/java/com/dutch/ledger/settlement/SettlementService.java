@@ -104,7 +104,7 @@ public class SettlementService {
 
         SettlementView view = SettlementView.from(settlement, groupId, "ACTIVE");
         journal.append(group.memberships().stream()
-                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "SETTLEMENT", settlement.id().value(), "upsert", 1,
                 objectMapper.convertValue(view, java.util.Map.class), null, now);
@@ -149,7 +149,7 @@ public class SettlementService {
 
         SettlementView view = SettlementView.from(settlement, groupId, "VOIDED");
         journal.append(group.memberships().stream()
-                        .filter(com.dutch.ledger.group.Membership::hasAppAccess)
+                        .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "SETTLEMENT", settlement.id().value(), "upsert", 2,
                 objectMapper.convertValue(view, java.util.Map.class), null, now);

@@ -9,6 +9,14 @@ RUN find "services/${SERVICE}/build/libs" -name '*.jar' ! -name '*-plain.jar' \
     -exec cp {} /workspace/app.jar \;
 
 FROM eclipse-temurin:21-jre
+ARG SERVICE
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="dutch-${SERVICE}" \
+      org.opencontainers.image.source="https://github.com/dutch/dutch" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
 RUN useradd --system --uid 10001 --no-create-home dutch
 COPY --from=build /workspace/app.jar /app/app.jar
 USER dutch

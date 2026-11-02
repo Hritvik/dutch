@@ -16,6 +16,8 @@ const requiredFiles = [
   "infrastructure/observability/grafana-dutch.json",
   "services/Dockerfile",
   ".dockerignore",
+  ".github/workflows/release.yml",
+  ".github/dependabot.yml",
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "infrastructure/aws/modules/foundation/main.tf",
@@ -95,6 +97,22 @@ export function inspectFoundation(repositoryRoot) {
   );
   for (const job of ["ledger", "notification", "gateway"]) {
     if (!scrape.includes(`job_name: ${job}`)) issues.push(`scrape config lacks ${job}`);
+  }
+  const release = fs.readFileSync(
+    path.join(repositoryRoot, ".github/workflows/release.yml"),
+    "utf8",
+  );
+  for (const expected of ["ghcr.io", "provenance:", "sbom:", "attest-build-provenance"]) {
+    if (!release.includes(expected)) issues.push(`release workflow lacks ${expected}`);
+  }
+  const dependabot = fs.readFileSync(
+    path.join(repositoryRoot, ".github/dependabot.yml"),
+    "utf8",
+  );
+  for (const ecosystem of ["gradle", "npm", "github-actions", "docker"]) {
+    if (!dependabot.includes(`package-ecosystem: ${ecosystem}`)) {
+      issues.push(`dependabot lacks ${ecosystem}`);
+    }
   }
   const dashboard = JSON.parse(fs.readFileSync(
     path.join(repositoryRoot, "infrastructure/observability/grafana-dutch.json"),

@@ -677,6 +677,34 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /api/v1/reports:
+    post:
+      operationId: createSafetyReport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "200":
+          description: The accepted safety report receipt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportResponse"
+        "400":
+          $ref: "#/components/responses/Invalid"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: Too many reports.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/v1/direct-expenses:
     post:
       operationId: createDirectExpense
@@ -1814,6 +1842,57 @@ components:
             - PAUSE
             - RESUME
             - ARCHIVE
+    CreateReportRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - category
+        - details
+      properties:
+        category:
+          type: string
+          enum:
+            - ABUSE
+            - HARASSMENT
+            - SPAM
+            - FRAUD
+            - OTHER
+        scopeType:
+          type: string
+          enum:
+            - GROUP
+            - DIRECT_EXPENSE
+            - MEMBER
+            - OTHER
+        scopeId:
+          type: string
+          maxLength: 256
+        details:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    ReportView:
+      type: object
+      additionalProperties: false
+      required:
+        - reportId
+        - status
+      properties:
+        reportId:
+          type: string
+          pattern: ^rep_[A-Za-z0-9_-]{16,128}$
+        status:
+          type: string
+          enum:
+            - RECEIVED
+    ReportResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/ReportView"
     DirectExpenseView:
       type: object
       additionalProperties: false

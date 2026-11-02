@@ -10,6 +10,7 @@ import com.dutch.ledger.group.GroupId;
 import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.outbox.OutboxPublisher;
 import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -33,17 +34,19 @@ public class ExpenseService {
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
     private final SyncJournal journal;
+    private final OutboxPublisher outbox;
     private final ObjectMapper objectMapper;
 
     public ExpenseService(ExpenseRepository expenses, GroupRepository groups, MemberResolver members,
                           IdempotencyStore idempotency, ActivityRepository activity,
-                          SyncJournal journal, ObjectMapper objectMapper) {
+                          SyncJournal journal, OutboxPublisher outbox, ObjectMapper objectMapper) {
         this.expenses = expenses;
         this.groups = groups;
         this.members = members;
         this.idempotency = idempotency;
         this.activity = activity;
         this.journal = journal;
+        this.outbox = outbox;
         this.objectMapper = objectMapper;
     }
 
@@ -93,11 +96,22 @@ public class ExpenseService {
                 ActivityAction.EXPENSE_CREATED, expense.id().value(), expense.revision(), now,
                 details));
         ExpenseView view = ExpenseView.from(expense);
+        java.util.List<String> audience = group.memberships().stream()
+                .filter(com.dutch.ledger.group.Membership::isActive)
+                .map(membership -> membership.memberId().value()).toList();
         journal.append(group.memberships().stream()
                         .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "EXPENSE", expense.id().value(), "upsert", expense.revision(),
                 objectMapper.convertValue(view, java.util.Map.class), null, now);
+        outbox.publish("ledger.expense.committed.v1", "expense", expense.id().value(),
+                expense.revision(), null, null, now, java.util.Map.of(
+                        "groupId", group.id().value(),
+                        "expenseId", expense.id().value(),
+                        "amountMinorUnits", expense.totalMinorUnits(),
+                        "currency", expense.currency(),
+                        "action", "created",
+                        "recipientMemberIds", audience));
         idempotency.complete(actor.value(), COMMAND, idempotencyKey, serialize(view));
         return view;
     }

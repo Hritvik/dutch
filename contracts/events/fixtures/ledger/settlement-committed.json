@@ -1,0 +1,18 @@
+{
+  "eventId": "9e5c2d0f-7b3a-4b5f-8c4b-3d2e6f8a0b12",
+  "eventType": "ledger.settlement.committed.v1",
+  "schemaVersion": 1,
+  "producer": "ledger",
+  "aggregate": { "type": "settlement", "id": "stl_012345678901234567", "version": 1 },
+  "correlationId": null,
+  "causationId": null,
+  "occurredAt": "2026-11-02T00:00:00Z",
+  "payload": {
+    "groupId": "grp_012345678901234567",
+    "settlementId": "stl_012345678901234567",
+    "amountMinorUnits": 100,
+    "currency": "INR",
+    "action": "recorded",
+    "recipientMemberIds": ["mem_012345678901234567", "mem_112345678901234567"]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dutch.example/events/ledger.settlement.committed.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "eventType", "schemaVersion", "producer", "aggregate", "occurredAt", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "eventType": { "const": "ledger.settlement.committed.v1" },
+    "schemaVersion": { "const": 1 },
+    "producer": { "const": "ledger" },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "version"],
+      "properties": {
+        "type": { "const": "settlement" },
+        "id": { "type": "string", "pattern": "^stl_[A-Za-z0-9_-]{16,128}$" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "correlationId": { "type": ["string", "null"] },
+    "causationId": { "type": ["string", "null"] },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groupId", "settlementId", "amountMinorUnits", "currency", "action", "recipientMemberIds"],
+      "properties": {
+        "groupId": { "type": "string", "pattern": "^grp_[A-Za-z0-9_-]{16,128}$" },
+        "settlementId": { "type": "string", "pattern": "^stl_[A-Za-z0-9_-]{16,128}$" },
+        "amountMinorUnits": { "type": "integer", "minimum": 1 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "action": { "enum": ["recorded", "voided"] },
+        "recipientMemberIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": { "type": "string", "pattern": "^mem_[A-Za-z0-9_-]{16,128}$" }
+        }
+      }
+    }
+  }
+}

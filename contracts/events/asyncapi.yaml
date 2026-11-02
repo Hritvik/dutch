@@ -11,8 +11,28 @@ channels:
       memberProfileMappingChanged:
         payload:
           $ref: './dutch/json-schema/dutch.member-profile.mapping-changed.v1.schema.json'
+  ledger.expense.committed.v1:
+    address: ledger.expense.committed.v1
+    messages:
+      expenseCommitted:
+        payload:
+          $ref: './ledger/json-schema/ledger.expense.committed.v1.schema.json'
+  ledger.settlement.committed.v1:
+    address: ledger.settlement.committed.v1
+    messages:
+      settlementCommitted:
+        payload:
+          $ref: './ledger/json-schema/ledger.settlement.committed.v1.schema.json'
 operations:
   publishMemberProfileMappingChanged:
     action: send
     channel:
       $ref: '#/channels/dutch.member-profile.mapping-changed.v1'
+  publishExpenseCommitted:
+    action: send
+    channel:
+      $ref: '#/channels/ledger.expense.committed.v1'
+  publishSettlementCommitted:
+    action: send
+    channel:
+      $ref: '#/channels/ledger.settlement.committed.v1'

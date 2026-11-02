@@ -10,6 +10,10 @@ gateway:
   routes:
     ums-base-url: ${GATEWAY_UMS_BASE_URL:http://localhost:8082}
     ledger-base-url: ${GATEWAY_LEDGER_BASE_URL:http://localhost:8083}
+    notification-base-url: ${GATEWAY_NOTIFICATION_BASE_URL:http://localhost:8088}
+  rate-limit:
+    capacity: ${GATEWAY_RATE_LIMIT_CAPACITY:120}
+    window-seconds: ${GATEWAY_RATE_LIMIT_WINDOW_SECONDS:60}
 management:
   endpoints:
     web:

@@ -48,6 +48,28 @@ test('rejects a mapping event whose envelope disagrees with its payload', async 
   assert.match(result.issues.join('\n'), /destination\.appRegistrationId/);
 });
 
+test('validates the ledger expense and settlement events', async () => {
+  for (const [eventType, file] of [
+    ['ledger.expense.committed.v1', 'expense-committed.json'],
+    ['ledger.settlement.committed.v1', 'settlement-committed.json']
+  ]) {
+    const fixture = JSON.parse(await readFile(
+      path.join(contractsRoot, 'events/fixtures/ledger', file), 'utf8'));
+    const result = await validateEventFixture(contractsRoot, eventType, fixture);
+    assert.deepEqual(result, { valid: true, issues: [] }, `${eventType}: ${result.issues}`);
+  }
+});
+
+test('rejects a ledger event whose aggregate disagrees with its payload', async () => {
+  const fixture = JSON.parse(await readFile(
+    path.join(contractsRoot, 'events/fixtures/ledger/expense-committed.json'), 'utf8'));
+  fixture.payload.expenseId = 'exp_112345678901234567';
+  const result = await validateEventFixture(
+    contractsRoot, 'ledger.expense.committed.v1', fixture);
+  assert.equal(result.valid, false);
+  assert.match(result.issues.join('\n'), /aggregate\.id/);
+});
+
 test('validates profile-state and profile-ready responses', async () => {
   for (const [file, schema] of [
     ['http/fixtures/success/profile-state-required.json', 'ProfileStateResponse'],
@@ -96,7 +118,11 @@ test('the 409 body is pinned to profile_required', async () => {
 test('publishes only the Dutch mapping channel', async () => {
   const asyncapi = parse(await readFile(
     path.join(contractsRoot, 'events/asyncapi.yaml'), 'utf8'));
-  assert.deepEqual(Object.keys(asyncapi.channels), ['dutch.member-profile.mapping-changed.v1']);
+  assert.deepEqual(Object.keys(asyncapi.channels), [
+    'dutch.member-profile.mapping-changed.v1',
+    'ledger.expense.committed.v1',
+    'ledger.settlement.committed.v1'
+  ]);
   assert.equal(asyncapi.info.version, '2.0.0');
 });
 

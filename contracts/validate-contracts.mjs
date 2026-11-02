@@ -99,20 +99,34 @@ export async function validateHttpFixture(
 
 const eventSchemas = {
   'dutch.member-profile.mapping-changed.v1':
-    'events/dutch/json-schema/dutch.member-profile.mapping-changed.v1.schema.json'
+    'events/dutch/json-schema/dutch.member-profile.mapping-changed.v1.schema.json',
+  'ledger.expense.committed.v1':
+    'events/ledger/json-schema/ledger.expense.committed.v1.schema.json',
+  'ledger.settlement.committed.v1':
+    'events/ledger/json-schema/ledger.settlement.committed.v1.schema.json'
 };
 
-function eventInvariantIssues(fixture) {
+function eventInvariantIssues(fixture, eventType) {
   const issues = [];
   const payload = fixture?.payload ?? {};
-  if (fixture?.aggregate?.id !== payload.memberId) {
-    issues.push('aggregate.id must equal payload.memberId');
+  if (eventType === 'dutch.member-profile.mapping-changed.v1') {
+    if (fixture?.aggregate?.id !== payload.memberId) {
+      issues.push('aggregate.id must equal payload.memberId');
+    }
+    if (fixture?.aggregate?.version !== payload.mappingVersion) {
+      issues.push('aggregate.version must equal payload.mappingVersion');
+    }
+    if (fixture?.destination?.appRegistrationId !== payload.appRegistrationId) {
+      issues.push('destination.appRegistrationId must equal payload.appRegistrationId');
+    }
   }
-  if (fixture?.aggregate?.version !== payload.mappingVersion) {
-    issues.push('aggregate.version must equal payload.mappingVersion');
+  if (eventType === 'ledger.expense.committed.v1'
+      && fixture?.aggregate?.id !== payload.expenseId) {
+    issues.push('aggregate.id must equal payload.expenseId');
   }
-  if (fixture?.destination?.appRegistrationId !== payload.appRegistrationId) {
-    issues.push('destination.appRegistrationId must equal payload.appRegistrationId');
+  if (eventType === 'ledger.settlement.committed.v1'
+      && fixture?.aggregate?.id !== payload.settlementId) {
+    issues.push('aggregate.id must equal payload.settlementId');
   }
   return issues;
 }
@@ -124,7 +138,7 @@ export async function validateEventFixture(contractsRoot, eventType, fixture) {
   }
   const schema = await readJson(path.join(contractsRoot, schemaPath));
   const sensitiveValueIssues = findSensitiveValues(fixture, '$', { allowProtected: true });
-  const issues = [...sensitiveValueIssues, ...eventInvariantIssues(fixture)];
+  const issues = [...sensitiveValueIssues, ...eventInvariantIssues(fixture, eventType)];
   const validate = createValidator().compile(schema);
   if (!validate(fixture)) issues.push(...formatErrors(validate.errors));
   return { valid: issues.length === 0, issues };
@@ -152,7 +166,8 @@ const httpFixtures = [
   ['ledger-create-expense', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-request.json', 'http/ledger/openapi.yaml'],
   ['ledger-create-expense-exact', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-exact.json', 'http/ledger/openapi.yaml'],
   ['ledger-create-expense-percentage', 'CreateExpenseRequest', 'http/fixtures/ledger/create-expense-percentage.json', 'http/ledger/openapi.yaml'],
-  ['ledger-idempotency-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-idempotency-conflict.json', 'http/ledger/openapi.yaml']
+  ['ledger-idempotency-conflict', 'ErrorResponse', 'http/fixtures/ledger/error-idempotency-conflict.json', 'http/ledger/openapi.yaml'],
+  ['notification-device', 'DeviceResponse', 'http/fixtures/notification/device.json', 'http/notification/openapi.yaml']
 ];
 
 export async function validateContracts(contractsRoot, overrides = {}) {

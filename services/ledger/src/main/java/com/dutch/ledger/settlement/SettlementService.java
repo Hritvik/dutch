@@ -13,6 +13,7 @@ import com.dutch.ledger.group.GroupRepository;
 import com.dutch.ledger.group.GroupRuleException;
 import com.dutch.ledger.group.MemberId;
 import com.dutch.ledger.group.MemberResolver;
+import com.dutch.ledger.outbox.OutboxPublisher;
 import com.dutch.ledger.sync.SyncJournal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -39,18 +40,20 @@ public class SettlementService {
     private final IdempotencyStore idempotency;
     private final ActivityRepository activity;
     private final SyncJournal journal;
+    private final OutboxPublisher outbox;
     private final ObjectMapper objectMapper;
 
     public SettlementService(SettlementRepository settlements, GroupRepository groups,
                              MemberResolver members, IdempotencyStore idempotency,
                              ActivityRepository activity, SyncJournal journal,
-                             ObjectMapper objectMapper) {
+                             OutboxPublisher outbox, ObjectMapper objectMapper) {
         this.settlements = settlements;
         this.groups = groups;
         this.members = members;
         this.idempotency = idempotency;
         this.activity = activity;
         this.journal = journal;
+        this.outbox = outbox;
         this.objectMapper = objectMapper;
     }
 
@@ -103,11 +106,22 @@ public class SettlementService {
                         "currency", settlement.currency(), "status", "ACTIVE")));
 
         SettlementView view = SettlementView.from(settlement, groupId, "ACTIVE");
+        java.util.List<String> audience = group.memberships().stream()
+                .filter(com.dutch.ledger.group.Membership::isActive)
+                .map(membership -> membership.memberId().value()).toList();
         journal.append(group.memberships().stream()
                         .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "SETTLEMENT", settlement.id().value(), "upsert", 1,
                 objectMapper.convertValue(view, java.util.Map.class), null, now);
+        outbox.publish("ledger.settlement.committed.v1", "settlement", settlement.id().value(),
+                1, null, null, now, java.util.Map.of(
+                        "groupId", group.id().value(),
+                        "settlementId", settlement.id().value(),
+                        "amountMinorUnits", settlement.totalMinorUnits(),
+                        "currency", settlement.currency(),
+                        "action", "recorded",
+                        "recipientMemberIds", audience));
         idempotency.complete(actor.value(), RECORD_COMMAND, idempotencyKey, serialize(view));
         return view;
     }
@@ -148,11 +162,22 @@ public class SettlementService {
                         "currency", settlement.currency(), "status", "VOIDED")));
 
         SettlementView view = SettlementView.from(settlement, groupId, "VOIDED");
+        java.util.List<String> audience = group.memberships().stream()
+                .filter(com.dutch.ledger.group.Membership::isActive)
+                .map(membership -> membership.memberId().value()).toList();
         journal.append(group.memberships().stream()
                         .filter(com.dutch.ledger.group.Membership::isActive)
                         .map(com.dutch.ledger.group.Membership::memberId).toList(),
                 "SETTLEMENT", settlement.id().value(), "upsert", 2,
                 objectMapper.convertValue(view, java.util.Map.class), null, now);
+        outbox.publish("ledger.settlement.committed.v1", "settlement", settlement.id().value(),
+                2, null, null, now, java.util.Map.of(
+                        "groupId", group.id().value(),
+                        "settlementId", settlement.id().value(),
+                        "amountMinorUnits", settlement.totalMinorUnits(),
+                        "currency", settlement.currency(),
+                        "action", "voided",
+                        "recipientMemberIds", audience));
         idempotency.complete(actor.value(), VOID_COMMAND, idempotencyKey, serialize(view));
         return view;
     }

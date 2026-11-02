@@ -21,6 +21,8 @@ class GatewayRoutingFilterTest {
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/me"))).isFalse();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/me/profile-state"))).isFalse();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/ledger/home"))).isFalse();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET",
+                "/api/v1/notifications/devices"))).isFalse();
     }
 
     @Test

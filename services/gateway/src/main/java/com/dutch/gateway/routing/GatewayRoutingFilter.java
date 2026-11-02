@@ -57,7 +57,9 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
         return !(path.equals("/api/v1/me")
                 || path.startsWith("/api/v1/me/")
                 || path.startsWith("/api/v1/ledger")
-                || path.startsWith("/api/v1/groups"));
+                || path.startsWith("/api/v1/groups")
+                || path.startsWith("/api/v1/notifications")
+                || path.startsWith("/api/v1/reports"));
     }
 
     @Override
@@ -103,7 +105,9 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         String base = path.equals("/api/v1/me") || path.startsWith("/api/v1/me/")
                 ? routes.umsBaseUrl()
-                : routes.ledgerBaseUrl();
+                : path.startsWith("/api/v1/notifications")
+                        ? routes.notificationBaseUrl()
+                        : routes.ledgerBaseUrl();
         String query = request.getQueryString();
         return URI.create(base + path + (query == null ? "" : "?" + query));
     }

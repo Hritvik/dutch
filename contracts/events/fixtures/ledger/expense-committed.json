@@ -1,0 +1,18 @@
+{
+  "eventId": "8d4b1c9e-6a2f-4a4e-9b3a-2c1d5e7f9a01",
+  "eventType": "ledger.expense.committed.v1",
+  "schemaVersion": 1,
+  "producer": "ledger",
+  "aggregate": { "type": "expense", "id": "exp_012345678901234567", "version": 1 },
+  "correlationId": null,
+  "causationId": null,
+  "occurredAt": "2026-11-02T00:00:00Z",
+  "payload": {
+    "groupId": "grp_012345678901234567",
+    "expenseId": "exp_012345678901234567",
+    "amountMinorUnits": 100,
+    "currency": "INR",
+    "action": "created",
+    "recipientMemberIds": ["mem_012345678901234567", "mem_112345678901234567"]
+  }
+}

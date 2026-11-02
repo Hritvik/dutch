@@ -10,4 +10,6 @@ public interface DirectExpenseRepository {
     Optional<DirectExpense> find(ExpenseId id);
 
     List<String> streamIds(ExpenseId id);
+
+    List<DirectExpense> findInvolving(com.dutch.ledger.group.MemberId memberId);
 }

@@ -88,6 +88,23 @@ class OutboxRelayIntegrationTest {
                 "SELECT published_at FROM outbox_event WHERE aggregate_id = ?",
                 java.sql.Timestamp.class, "exp_112345678901234567")).isNotNull();
         assertThat(relay.relayOnce()).isZero();
+
+        // Rehearsed recovery: clear the dead letter, reset the row, and replay safely.
+        jdbc.update("""
+                DELETE FROM outbox_dead_letter WHERE event_id IN
+                    (SELECT event_id FROM outbox_event WHERE aggregate_id = ?)
+                """, "exp_112345678901234567");
+        jdbc.update("""
+                UPDATE outbox_event SET published_at = NULL, claimed_at = NULL,
+                    publish_attempts = 0, last_error = NULL
+                WHERE aggregate_id = ?
+                """, "exp_112345678901234567");
+        TestTransport recovered = new TestTransport(false);
+        assertThat(relay(recovered).relayOnce()).isEqualTo(1);
+        assertThat(recovered.sent).hasSize(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT published_at FROM outbox_event WHERE aggregate_id = ?",
+                java.sql.Timestamp.class, "exp_112345678901234567")).isNotNull();
     }
 
     private static OutboxRelay relay(TestTransport transport) {

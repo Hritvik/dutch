@@ -120,6 +120,26 @@ public class JdbcDirectExpenseRepository implements DirectExpenseRepository {
                 payers, shares, row.occurredAt(), row.revision()));
     }
 
+    @Override
+    public List<DirectExpense> findInvolving(com.dutch.ledger.group.MemberId memberId) {
+        return jdbc.query("""
+                SELECT d.direct_expense_id
+                FROM direct_expense d
+                WHERE EXISTS (
+                    SELECT 1 FROM direct_payer_contribution p
+                    WHERE p.direct_expense_id = d.direct_expense_id AND p.member_id = ?
+                ) OR EXISTS (
+                    SELECT 1 FROM direct_participant_share s
+                    WHERE s.direct_expense_id = d.direct_expense_id AND s.member_id = ?
+                )
+                ORDER BY d.direct_expense_id
+                """, (result, index) -> result.getString("direct_expense_id"),
+                memberId.value(), memberId.value()).stream()
+                .map(value -> find(new ExpenseId(value)))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
     /** The direct-pair streams currently holding entries for this expense. */
     @Override
     public List<String> streamIds(ExpenseId id) {

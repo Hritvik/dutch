@@ -59,7 +59,8 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
                 || path.startsWith("/api/v1/ledger")
                 || path.startsWith("/api/v1/groups")
                 || path.startsWith("/api/v1/notifications")
-                || path.startsWith("/api/v1/reports"));
+                || path.startsWith("/api/v1/reports")
+                || path.startsWith("/api/v1/privacy"));
     }
 
     @Override

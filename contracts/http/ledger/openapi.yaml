@@ -677,6 +677,22 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
+  /api/v1/privacy/export:
+    get:
+      operationId: exportPrivacyData
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's authorized Ledger projection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrivacyExportResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /api/v1/reports:
     post:
       operationId: createSafetyReport
@@ -1842,6 +1858,44 @@ components:
             - PAUSE
             - RESUME
             - ARCHIVE
+    PrivacyExportView:
+      type: object
+      additionalProperties: false
+      required:
+        - memberId
+        - exportedAt
+        - groups
+        - directExpenses
+        - series
+      properties:
+        memberId:
+          $ref: "#/components/schemas/MemberId"
+        exportedAt:
+          type: string
+          format: date-time
+        groups:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/GroupView"
+        directExpenses:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/DirectExpenseView"
+        series:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/SeriesView"
+    PrivacyExportResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/PrivacyExportView"
     CreateReportRequest:
       type: object
       additionalProperties: false

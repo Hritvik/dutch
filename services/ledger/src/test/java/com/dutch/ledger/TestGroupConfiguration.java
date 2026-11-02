@@ -359,6 +359,22 @@ public class TestGroupConfiguration {
         }
 
         @Override
+        public java.util.List<DirectExpense> findInvolving(MemberId memberId) {
+            Map<com.dutch.ledger.expense.ExpenseId, DirectExpense> latest = new java.util.LinkedHashMap<>();
+            for (DirectExpense expense : saved) {
+                boolean involved = expense.payers().stream()
+                        .anyMatch(payer -> payer.memberId().equals(memberId))
+                        || expense.shares().stream()
+                        .anyMatch(share -> share.memberId().equals(memberId));
+                if (involved) {
+                    latest.merge(expense.id(), expense,
+                            (left, right) -> left.revision() >= right.revision() ? left : right);
+                }
+            }
+            return java.util.List.copyOf(latest.values());
+        }
+
+        @Override
         public java.util.List<String> streamIds(com.dutch.ledger.expense.ExpenseId id) {
             return find(id).map(expense -> expense.obligationEntries().stream()
                     .map(entry -> DirectScope.streamId(entry.debtor(), entry.creditor(),

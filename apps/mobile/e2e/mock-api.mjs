@@ -39,6 +39,7 @@ let directActivity = [];
 let seriesById = new Map();
 let occurrencesBySeries = new Map();
 let firstSync = true;
+let lostSettlementResponse = false;
 
 function json(response, status, body) {
   const payload = JSON.stringify(body);
@@ -159,6 +160,7 @@ const server = createServer(async (request, response) => {
     seriesById = new Map();
     occurrencesBySeries = new Map();
     firstSync = true;
+    lostSettlementResponse = false;
     response.writeHead(204).end();
     return;
   }
@@ -574,6 +576,14 @@ const server = createServer(async (request, response) => {
         currency: payload.currency,
         status: 'ACTIVE'
       });
+      if (!lostSettlementResponse) {
+        // Commit the command, then lose the response once; the retry must replay it.
+        lostSettlementResponse = true;
+        json(response, 503, {
+          error: { code: 'service_unavailable', message: 'Try again.' }
+        });
+        return;
+      }
       json(response, 200, { data: settlement });
       return;
     }

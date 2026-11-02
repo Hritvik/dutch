@@ -119,9 +119,25 @@ public class GroupService {
     }
 
     protected GroupView persist(Group group, long expected) {
+        Group previous = groups.findById(group.id()).orElse(group);
         groups.save(group, expected);
         append(group);
+        appendAccessChanges(previous, group);
         return group.view();
+    }
+
+    /** An Inactive Membership keeps read-only history, announced as an access change. */
+    private void appendAccessChanges(Group previous, Group group) {
+        for (Membership membership : group.memberships()) {
+            boolean wasActive = previous.membership(membership.memberId())
+                    .map(Membership::isActive).orElse(false);
+            if (wasActive && membership.state() == MembershipState.INACTIVE) {
+                journal.append(List.of(membership.memberId()), "GROUP", group.id().value(),
+                        "access_changed", group.version(),
+                        Map.of("groupId", group.id().value(), "access", "read"),
+                        null, Instant.now());
+            }
+        }
     }
 
     private void append(Group group) {

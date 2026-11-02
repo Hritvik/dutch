@@ -1,0 +1,31 @@
+appId: com.dutch.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Share costs without losing the plot."
+- tapOn: "Use test identity"
+- extendedWaitUntil:
+    visible: "You are signed in."
+    timeout: 20000
+- tapOn: "View groups"
+- tapOn: "Flat 12"
+- scrollUntilVisible:
+    element: "Record settlement"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Record settlement"
+- tapOn:
+    id: "settlement-amount"
+- inputText: "50"
+- hideKeyboard
+- tapOn: "Review settlement"
+- tapOn: "Confirm settlement"
+- extendedWaitUntil:
+    visible: "We could not record the settlement. Try again."
+    timeout: 10000
+- takeScreenshot: android-settlement-lost-response
+- tapOn: "Confirm settlement"
+- extendedWaitUntil:
+    visible: "Recorded"
+    timeout: 10000
+- takeScreenshot: android-settlement-replayed

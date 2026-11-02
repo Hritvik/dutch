@@ -94,6 +94,48 @@ class SyncControllerTest {
     }
 
     @Test
+    void a_membership_becoming_inactive_emits_a_read_only_access_change() throws Exception {
+        String created = mockMvc.perform(post("/api/v1/groups").with(as(ADMIN_SUBJECT))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Access flat\",\"currency\":\"INR\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String groupId = JsonPath.read(created, "$.data.id");
+        int version = JsonPath.read(created, "$.data.version");
+
+        String invited = mockMvc.perform(post("/api/v1/groups/" + groupId + "/members")
+                        .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"" + version + "\"")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"memberId\":\"" + MEMBER.value() + "\",\"role\":\"MEMBER\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        version = JsonPath.read(invited, "$.data.version");
+        String activated = mockMvc.perform(post("/api/v1/groups/" + groupId + "/members/"
+                        + MEMBER.value() + "/activate")
+                        .with(as(MEMBER_SUBJECT))
+                        .header("If-Match", "\"" + version + "\""))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        version = JsonPath.read(activated, "$.data.version");
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/v1/groups/" + groupId + "/members/" + MEMBER.value())
+                        .with(as(ADMIN_SUBJECT))
+                        .header("If-Match", "\"" + version + "\""))
+                .andExpect(status().isOk());
+
+        String snapshot = mockMvc.perform(post("/api/v1/ledger/sync-snapshots")
+                        .with(as(MEMBER_SUBJECT)))
+                .andReturn().getResponse().getContentAsString();
+        String token = JsonPath.read(snapshot, "$.data.token");
+        mockMvc.perform(get("/api/v1/ledger/sync-snapshots/" + token).with(as(MEMBER_SUBJECT)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.changes[?(@.resourceId == '" + groupId
+                        + "' && @.operation == 'access_changed')].payload.access")
+                        .value(hasItem("read")));
+    }
+
+    @Test
     void a_snapshot_returns_the_latest_non_tombstone_resource() throws Exception {
         journal.append(List.of(ADMIN), "SERIES", "ser_012345678901234567", "upsert", 1,
                 Map.of("status", "ACTIVE"), null, Instant.now());

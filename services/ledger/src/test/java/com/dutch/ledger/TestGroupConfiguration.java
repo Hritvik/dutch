@@ -55,11 +55,14 @@ public class TestGroupConfiguration {
     public static final MemberId ADMIN = new MemberId("mem_012345678901234567");
     public static final MemberId MEMBER = new MemberId("mem_112345678901234567");
     public static final MemberId OUTSIDER = new MemberId("mem_212345678901234567");
+    public static final String SYNC_SUBJECT = "aps_sync_01234567890123456789012";
+    public static final MemberId SYNC_MEMBER = new MemberId("mem_312345678901234567");
 
     private static final Map<String, MemberId> MEMBERS = Map.of(
             ADMIN_SUBJECT, ADMIN,
             MEMBER_SUBJECT, MEMBER,
-            OUTSIDER_SUBJECT, OUTSIDER);
+            OUTSIDER_SUBJECT, OUTSIDER,
+            SYNC_SUBJECT, SYNC_MEMBER);
 
     @Bean
     @Primary

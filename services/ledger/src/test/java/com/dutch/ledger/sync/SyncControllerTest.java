@@ -5,6 +5,8 @@ import static com.dutch.ledger.TestGroupConfiguration.ADMIN_SUBJECT;
 import static com.dutch.ledger.TestGroupConfiguration.MEMBER;
 import static com.dutch.ledger.TestGroupConfiguration.MEMBER_SUBJECT;
 import static com.dutch.ledger.TestGroupConfiguration.OUTSIDER;
+import static com.dutch.ledger.TestGroupConfiguration.SYNC_MEMBER;
+import static com.dutch.ledger.TestGroupConfiguration.SYNC_SUBJECT;
 import static com.dutch.ledger.TestGroupConfiguration.OUTSIDER_SUBJECT;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
@@ -168,15 +170,15 @@ class SyncControllerTest {
 
     @Test
     void a_large_snapshot_is_paged_without_dropping_resources() throws Exception {
-        journal.append(List.of(MEMBER), "GROUP", "grp_112345678901234567", "upsert", 1,
+        journal.append(List.of(SYNC_MEMBER), "GROUP", "grp_112345678901234567", "upsert", 1,
                 Map.of("name", "One"), null, Instant.now());
-        journal.append(List.of(MEMBER), "GROUP", "grp_212345678901234567", "upsert", 1,
+        journal.append(List.of(SYNC_MEMBER), "GROUP", "grp_212345678901234567", "upsert", 1,
                 Map.of("name", "Two"), null, Instant.now());
-        journal.append(List.of(MEMBER), "GROUP", "grp_312345678901234567", "upsert", 1,
+        journal.append(List.of(SYNC_MEMBER), "GROUP", "grp_312345678901234567", "upsert", 1,
                 Map.of("name", "Three"), null, Instant.now());
 
         String snapshot = mockMvc.perform(post("/api/v1/ledger/sync-snapshots")
-                        .with(as(MEMBER_SUBJECT)))
+                        .with(as(SYNC_SUBJECT)))
                 .andReturn().getResponse().getContentAsString();
         String token = JsonPath.read(snapshot, "$.data.token");
 
@@ -184,7 +186,7 @@ class SyncControllerTest {
         Integer cursor = null;
         for (int page = 0; page < 20; page++) {
             var request = get("/api/v1/ledger/sync-snapshots/" + token)
-                    .param("limit", "2").with(as(MEMBER_SUBJECT));
+                    .param("limit", "2").with(as(SYNC_SUBJECT));
             if (cursor != null) {
                 request = request.param("cursor", String.valueOf(cursor));
             }

@@ -1,5 +1,5 @@
 # Build one Spring Boot service from the shared multi-module Gradle build.
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
 COPY . .
 ARG SERVICE
@@ -8,7 +8,7 @@ RUN --mount=type=cache,target=/root/.gradle \
 RUN find "services/${SERVICE}/build/libs" -name '*.jar' ! -name '*-plain.jar' \
     -exec cp {} /workspace/app.jar \;
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 ARG SERVICE
 ARG VERSION=dev
 ARG REVISION=unknown

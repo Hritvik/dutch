@@ -67,6 +67,11 @@ jobs:
       - run: node tools/check-accessibility.mjs
       - run: tofu fmt -check -recursive infrastructure/aws
       - run: |
+          for module in bootstrap modules/messaging; do
+            tofu -chdir=infrastructure/aws/$module init -backend=false
+            tofu -chdir=infrastructure/aws/$module validate
+          done
+      - run: |
           for environment in development staging production; do
             tofu -chdir=infrastructure/aws/environments/$environment init -backend=false
             tofu -chdir=infrastructure/aws/environments/$environment validate

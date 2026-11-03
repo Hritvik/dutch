@@ -21,6 +21,8 @@ const requiredFiles = [
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "infrastructure/aws/modules/foundation/main.tf",
+  "infrastructure/aws/bootstrap/main.tf",
+  "infrastructure/aws/modules/messaging/main.tf",
   "infrastructure/aws/modules/foundation/variables.tf",
   "infrastructure/aws/modules/foundation/outputs.tf",
   "infrastructure/aws/environments/development/main.tf",

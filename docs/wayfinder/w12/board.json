@@ -97,7 +97,7 @@
       "id": "W12-R",
       "title": "Independent contract and privacy review",
       "kind": "review",
-      "status": "draft",
+      "status": "ready",
       "packet": "packets/W12-R.md",
       "evidence": "evidence/W12-R.md",
       "depends_on": [],
@@ -112,10 +112,10 @@
       "checkpoint": null,
       "central": {
         "task": "dutch-ref/W12-R",
-        "revision": 0,
-        "status": "draft",
+        "revision": 1,
+        "status": "ready",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-05T03:16:08Z"
       }
     },
     {
@@ -149,6 +149,6 @@
   "central_registry": {
     "home": "capabilities/work",
     "board": "dutch.ref.w12",
-    "synced_at": "2026-11-05T03:15:04Z"
+    "synced_at": "2026-11-05T03:16:08Z"
   }
 }

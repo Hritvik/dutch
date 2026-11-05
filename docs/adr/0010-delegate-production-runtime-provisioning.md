@@ -40,9 +40,15 @@ and consumes a managed runtime from a platform provider.
 - Dutch does not keep AWS accounts, OpenTofu environments, or resource modules.
   `infrastructure/aws` is removed; its provisional modules are recoverable from
   history but are not a Dutch deliverable.
-- The provider, region/account model, cost envelope, and drill ownership stay
-  open in the contract until a provider accepts them. No commitment exists yet,
-  so S7's production gate remains unproven rather than satisfied.
+- The provider is the `distracted-dev-infra` effort, assigned by the portfolio
+  owner on 2026-11-05 (`dutch-runtime-provider-decision-001`). The assignment is
+  not a commitment: the effort's own capability map excludes production
+  deployment and real-environment secret management, and its direction is
+  free-tier multi-cloud rather than the managed AWS shape in ADR 0007. Both
+  conflicts are recorded against the contract and must be answered.
+- Region/account model, cost envelope, and drill ownership remain open
+  (dutch-runtime-q-002, q-003). No commitment exists yet, so S7's production gate
+  remains unproven rather than satisfied.
 
 ## Consequences
 

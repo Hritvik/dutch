@@ -2,10 +2,14 @@
 
 ## Decision
 
-Dutch requires a single-region, multi-AZ managed runtime and states that
-requirement as a capability expectation (`dutch-managed-production-runtime`); a
-platform provider provisions the account, network, storage, messaging, and secret
-store. Dutch supplies the service image, the endpoints and signals it must expose,
+Dutch requires a single-region, multi-AZ runtime with private networking,
+isolated restorable storage, ordered durable delivery, runtime secret injection,
+digest deployment, and alert delivery, stated as a capability expectation
+(`dutch-managed-production-runtime`). The `distracted-dev-infra` effort provisions
+the account, network, storage, messaging, and secret store. The AWS names elsewhere
+in this document describe the original proposed shape, not a binding requirement:
+the provider may realize the properties another way and must say which ones it
+cannot. Dutch supplies the service image, the endpoints and signals it must expose,
 and the release record. Environment configuration is explicit and secrets never
 enter source, image layers, mobile bundles, or plan output.
 

@@ -15,7 +15,7 @@
       "id": "W12-A",
       "title": "Serve profile state and the profile split",
       "kind": "implementation",
-      "status": "ready",
+      "status": "integrated",
       "packet": "packets/W12-A.md",
       "evidence": "evidence/W12-A.md",
       "depends_on": [],
@@ -41,7 +41,7 @@
       "id": "W12-B",
       "title": "Align correlation and errors with the pinned envelope",
       "kind": "implementation",
-      "status": "ready",
+      "status": "integrated",
       "packet": "packets/W12-B.md",
       "evidence": "evidence/W12-B.md",
       "depends_on": [],
@@ -68,7 +68,7 @@
       "id": "W12-C",
       "title": "Prove the profile journey end to end",
       "kind": "integration",
-      "status": "draft",
+      "status": "integrated",
       "packet": "packets/W12-C.md",
       "evidence": "evidence/W12-C.md",
       "depends_on": [
@@ -149,6 +149,6 @@
   "central_registry": {
     "home": "capabilities/work",
     "board": "dutch.ref.w12",
-    "synced_at": "2026-11-02T03:16:06Z"
+    "synced_at": "2026-11-05T03:15:04Z"
   }
 }

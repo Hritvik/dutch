@@ -15,7 +15,7 @@
       "id": "W10-A",
       "title": "Pin the Dutch mapping event",
       "kind": "implementation",
-      "status": "reviewed",
+      "status": "integrated",
       "packet": "packets/W10-A.md",
       "evidence": "evidence/W10-A.md",
       "depends_on": [],
@@ -53,17 +53,17 @@
       ],
       "central": {
         "task": "dutch-ref/W10-A",
-        "revision": 0,
-        "status": "reviewed",
+        "revision": 1,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-05T03:15:04Z"
       }
     },
     {
       "id": "W10-B",
       "title": "Pin the Dutch profile HTTP contract",
       "kind": "implementation",
-      "status": "reviewed",
+      "status": "integrated",
       "packet": "packets/W10-B.md",
       "evidence": "evidence/W10-B.md",
       "depends_on": [],
@@ -108,17 +108,17 @@
       ],
       "central": {
         "task": "dutch-ref/W10-B",
-        "revision": 0,
-        "status": "reviewed",
+        "revision": 1,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-05T03:15:04Z"
       }
     },
     {
       "id": "W10-C",
       "title": "Fixtures, harness and bundle pin",
       "kind": "implementation",
-      "status": "green",
+      "status": "integrated",
       "packet": "packets/W10-C.md",
       "evidence": "evidence/W10-C.md",
       "depends_on": [
@@ -164,10 +164,10 @@
       "implementation_agent": "OPENCODE-DS41F",
       "central": {
         "task": "dutch-ref/W10-C",
-        "revision": 0,
-        "status": "green",
+        "revision": 2,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-05T03:15:04Z"
       }
     },
     {
@@ -275,6 +275,6 @@
   "central_registry": {
     "home": "capabilities/work",
     "board": "dutch.ref.w10",
-    "synced_at": "2026-11-01T00:00:00Z"
+    "synced_at": "2026-11-05T03:15:04Z"
   }
 }

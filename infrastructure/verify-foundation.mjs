@@ -146,5 +146,31 @@ export function inspectFoundation(repositoryRoot) {
   if (provenance.properties?.schemaVersion?.const !== 1) {
     issues.push("release provenance schema version must be 1");
   }
+  const releasesRoot = path.join(repositoryRoot, "infrastructure/provenance/releases");
+  if (!fs.existsSync(releasesRoot)) {
+    issues.push("missing infrastructure/provenance/releases");
+  } else {
+    const records = fs
+      .readdirSync(releasesRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .flatMap((version) =>
+        fs
+          .readdirSync(path.join(releasesRoot, version.name))
+          .filter((file) => file.endsWith(".json"))
+          .map((file) => path.join(releasesRoot, version.name, file)),
+      );
+    for (const recordPath of records) {
+      const record = JSON.parse(fs.readFileSync(recordPath, "utf8"));
+      if (record.schemaVersion !== 1) {
+        issues.push(`${path.relative(repositoryRoot, recordPath)} schemaVersion must be 1`);
+      }
+      if (!/^sha256:[a-f0-9]{64}$/.test(record.artifactDigest ?? "")) {
+        issues.push(`${path.relative(repositoryRoot, recordPath)} needs an image digest`);
+      }
+      if (!record.sourceRevision) {
+        issues.push(`${path.relative(repositoryRoot, recordPath)} needs a source revision`);
+      }
+    }
+  }
   return issues;
 }

@@ -9,7 +9,9 @@ digest deployment, and alert delivery, stated as a capability expectation
 the account, network, storage, messaging, and secret store. The AWS names elsewhere
 in this document describe the original proposed shape, not a binding requirement:
 the provider may realize the properties another way and must say which ones it
-cannot. Dutch supplies the service image, the endpoints and signals it must expose,
+cannot. As of 2026-11-05 it has said exactly that: four of the seven required
+properties are deferred and none are committed, so this document describes a
+requirement set, not an available environment. Dutch supplies the service image, the endpoints and signals it must expose,
 and the release record. Environment configuration is explicit and secrets never
 enter source, image layers, mobile bundles, or plan output.
 

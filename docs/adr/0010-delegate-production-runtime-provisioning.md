@@ -46,9 +46,15 @@ and consumes a managed runtime from a platform provider.
   deployment and real-environment secret management, and its direction is
   free-tier multi-cloud rather than the managed AWS shape in ADR 0007. Both
   conflicts are recorded against the contract and must be answered.
+- The provider has responded (2026-11-05): **3 explore, 4 defer, 0 commitments**.
+  The deferred set is exactly Dutch's correctness surface — restorable storage,
+  ordered delivery with dead letters, alert delivery, and a separate migration
+  identity. The provider states plainly that a free-tier pilot does not yet
+  supply those semantics and that managed AWS is neither mandated nor authorized.
 - Region/account model, cost envelope, and drill ownership remain open
-  (dutch-runtime-q-002, q-003). No commitment exists yet, so S7's production gate
-  remains unproven rather than satisfied.
+  (dutch-runtime-q-002, q-003). S7's production gate remains unproven rather than
+  satisfied, and Dutch records the deferrals as honest reporting rather than as
+  acceptance of the gap.
 
 ## Consequences
 

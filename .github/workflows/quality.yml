@@ -64,23 +64,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - uses: opentofu/setup-opentofu@v1
       - run: node --test infrastructure/test/*.test.mjs
       - run: node tools/scan-secrets.mjs
       - run: node tools/release-record.mjs validate infrastructure/provenance/release-record.example.json
       - run: node tools/check-accessibility.mjs
-      - run: tofu fmt -check -recursive infrastructure/aws
-      - run: |
-          for module in bootstrap modules/messaging; do
-            tofu -chdir=infrastructure/aws/$module init -backend=false
-            tofu -chdir=infrastructure/aws/$module validate
-          done
-      - run: |
-          for environment in development staging production; do
-            tofu -chdir=infrastructure/aws/environments/$environment init -backend=false
-            tofu -chdir=infrastructure/aws/environments/$environment validate
-            tofu -chdir=infrastructure/aws/environments/$environment plan -input=false -refresh=false
-          done
+      - run: node tools/release-record.mjs validate infrastructure/provenance/release-record.example.json
 
   container:
     runs-on: ubuntu-latest

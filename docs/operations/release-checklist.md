@@ -16,8 +16,9 @@
 - [ ] `cd contracts && npm test && npm audit --omit=dev --audit-level=critical`
 - [ ] `cd apps/mobile && npm test && npm run lint && npm run typecheck && npm audit`
 - [ ] `node --test infrastructure/test/*.test.mjs`
-- [ ] `tofu fmt -check -recursive infrastructure/aws`, `init -backend=false`,
-      `validate`, and a credential-free plan for development/staging/production.
+- [ ] Provider runtime evidence referenced for development/staging/production:
+      reviewed plan/apply, private networking, isolated and restorable storage,
+      digest-pinned deployment, and alert delivery.
 - [ ] Migration rehearsal: the version sequence is contiguous and each service's
       Flyway history is clean.
 - [ ] Restore rehearsal: `infrastructure/local/bin/rehearse-restore.sh` passes;

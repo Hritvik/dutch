@@ -2,7 +2,15 @@
 
 ## Decision
 
-Deploy Dutch in AWS `ap-south-1` as a single-region, multi-AZ MVP. Use separate AWS accounts for development, staging, and production. Provision all cloud resources with OpenTofu in `infrastructure/aws`; environment configuration is explicit and secrets never enter source, image layers, mobile bundles, or plan output.
+Dutch requires a single-region, multi-AZ managed runtime and states that
+requirement as a capability expectation (`dutch-managed-production-runtime`); a
+platform provider provisions the account, network, storage, messaging, and secret
+store. Dutch supplies the service image, the endpoints and signals it must expose,
+and the release record. Environment configuration is explicit and secrets never
+enter source, image layers, mobile bundles, or plan output.
+
+ADR 0010 records the ownership boundary. This document describes the runtime shape
+Dutch needs, not infrastructure Dutch operates.
 
 Production runs immutable ECR image digests on ECS Fargate behind an internet-facing ALB/WAF. Gateway is public; IAM, UMS, Ledger, Notification workers, RDS, and supporting endpoints are private. Each service has a task role, security group, database role/schema/database, migration history, and deployment unit.
 
@@ -41,13 +49,15 @@ flowchart TB
 
 ## Infrastructure and access control
 
-OpenTofu modules declare account bootstrap, networking, ECS/ECR, RDS, SNS/SQS, Secrets Manager/KMS, S3, CloudWatch, WAF, and EAS-facing release configuration. Each environment composes pinned module versions and has independent encrypted remote state with least-privilege, OIDC-authenticated CI access. Plan/apply output is redacted and reviewed; only the production deployment role may apply production changes.
+The provider owns account bootstrap, networking, container runtime/registry, RDS, SNS/SQS, Secrets Manager/KMS, S3, CloudWatch, WAF, and the CI access path. Dutch states the properties it depends on and reviews the provider's plan for the resources its services run on; it holds no credentials that can create accounts, networks, or databases.
+
+The expectation set lives in the central capability home and is not authoritative in this repository. Dutch evidence links to it rather than restating it.
 
 Use private subnets, security groups limited to required caller/port pairs, VPC endpoints where cost/traffic justifies them, TLS externally and service-to-service, and task roles instead of static AWS credentials. KMS keys are separated for secrets, exports, and infrastructure state. Database, signing, provider, and mobile-release secrets are fetched at task/runtime or CI step scope and redacted in logs.
 
 ## Delivery and migration flow
 
-1. CI validates format, compile/typecheck, unit/integration/contract/security suites, dependency/secret scans, OpenTofu formatting/validation/plan, and image vulnerability policy.
+1. Dutch CI validates format, compile/typecheck, unit/integration/contract/security suites, dependency and secret scans, container image build, release-record validity, and accessibility. The provider's plan/apply review is provider evidence, not a Dutch CI job.
 2. A tagged commit builds one immutable image per changed service, records digest/SBOM/provenance, and deploys the same digest to development then staging.
 3. Before a service rollout, a one-off ECS migration task using the service-specific migration role applies only backward-compatible expand changes. The service image starts only after migration health/compatibility checks pass.
 4. Staging runs service, queue/outbox, contract, device E2E, restore/reconciliation, and observability checks. Production promotion is a reviewed deployment of the already-tested image digest—not a rebuild.
@@ -79,7 +89,7 @@ Dashboards distinguish authoritative Ledger correctness from eventual notificati
 
 ## Required evidence before production promotion
 
-1. OpenTofu plan reviewed; image digest/SBOM/dependency/security evidence retained; no secret in build/log/config output.
+1. Provider plan and apply evidence referenced from the runtime contract; image digest/SBOM/dependency/security evidence retained; no secret in build/log/config output.
 2. Backward-compatible migration rehearsal and current/previous mobile runtime/API/event compatibility pass.
 3. iOS and Android staging device journeys pass on the exact EAS runtime/channel; OTA provenance is recorded.
 4. RDS restore plus projection/outbox reconciliation, queue/DLQ replay, alert routing, and incident runbook exercises meet RPO/RTO targets.

@@ -85,7 +85,10 @@ global Human Identity ID.
 ## Repository and delivery topology
 
 Dutch retains its product-owned services, mobile application, Dutch contracts,
-and infrastructure. IAM and UMS are independently delivered repositories.
+and the artifacts that describe them (container image, signal definitions, release
+provenance). Production environment provisioning is a platform capability Dutch
+consumes, not infrastructure Dutch owns. IAM and UMS are independently delivered
+repositories.
 Their schemas are imported at pinned versions; Dutch does not fork their
 provider contracts or copy their runtime code.
 

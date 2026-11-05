@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by ADR 0010: the runtime shape below is the Dutch requirement,
+but provisioning is delegated to a platform capability rather than owned here.
 
 ## Context
 

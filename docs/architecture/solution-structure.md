@@ -36,7 +36,8 @@ dutch/
 │   └── java-foundation/        # non-domain primitives: correlation, errors, tracing
 ├── infrastructure/
 │   ├── local/                  # local dependencies and deterministic test support
-│   └── aws/                    # environment-specific infrastructure as code
+│   ├── observability/          # Dutch-authored dashboard, alert, and scrape definitions
+│   └── provenance/             # release record schema and recorded evidence
 ├── docs/
 │   ├── adr/
 │   └── architecture/
@@ -47,6 +48,12 @@ The dedicated `iam` and `ums` repositories supply the respective provider
 deployables and published contract bundles. Existing `services/iam` and
 `services/ums` modules are legacy development prototypes, not canonical provider
 implementations or future Dutch release targets.
+
+Environment provisioning is not a Dutch deliverable. Dutch publishes its runtime
+requirements as a capability expectation (see ADR 0010) and keeps only the
+artifacts that describe its own services: the container image, health and metrics
+endpoints, migration order, signal definitions, and the release provenance record.
+No AWS account, OpenTofu environment, or resource module lives in this repository.
 
 The root Gradle build becomes a multi-project build for `services`, `libraries`, and `build-logic`. `apps/mobile` keeps its native JavaScript package manager and Expo tooling; Gradle does not own its dependency graph. CI has service-specific and mobile-specific jobs, plus contract compatibility jobs.
 

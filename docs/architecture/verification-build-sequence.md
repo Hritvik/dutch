@@ -21,7 +21,7 @@ Quality is not one final test phase. A failing acceptance, contract, or invarian
 
 ### Slice 0 — repository, contract, and test foundation
 
-Create the Gradle multi-project services, Expo app package, contract directories, database migration conventions, local dependency topology, CI quality gates, OpenTofu skeleton, fixture builders, and correlation/error/idempotency helpers. Establish ArchUnit/module dependency tests so services cannot reach another service's repositories/migrations, and make each service start against its own Testcontainers PostgreSQL database.
+Create the Gradle multi-project services, Expo app package, contract directories, database migration conventions, local dependency topology, CI quality gates, fixture builders, and correlation/error/idempotency helpers. Establish ArchUnit/module dependency tests so services cannot reach another service's repositories/migrations, and make each service start against its own Testcontainers PostgreSQL database.
 
 Exit: a clean environment runs migrations, contract fixture validation, module-boundary tests, and empty service/mobile builds; the Gateway rejects unauthenticated Ledger routes.
 
@@ -63,7 +63,7 @@ Exit: duplicate/replayed events are harmless, failed push does not affect financ
 
 ### Slice 7 — production readiness and controlled launch
 
-Complete production OpenTofu environments, scaling/cost limits, backup/restore, migration compatibility, EAS promotion, device acceptance, accessibility, performance, security, legal/support, and comprehension evidence. Launch only after staged release gates pass.
+Consume an accepted production runtime (private networking, isolated restorable storage, FIFO delivery, secret injection, digest deployment) from a platform provider, plus scaling/cost limits, backup/restore, migration compatibility, EAS promotion, device acceptance, accessibility, performance, security, legal/support, and comprehension evidence. Launch only after staged release gates pass.
 
 Exit: approved release record includes image/update/runtime/API/event/migration versions, tests, restore/outbox evidence, alert/runbook evidence, approver, and rollback/forward-repair owner.
 
@@ -76,7 +76,7 @@ Exit: approved release record includes image/update/runtime/API/event/migration 
 | API/events | OpenAPI/JSON Schema validation, producer/consumer fixtures, compatibility, duplicate/out-of-order tests |
 | IAM/privacy | token/PKCE/refresh/claim/authorization negative tests, secret/log-redaction checks, service-to-service scope tests |
 | Mobile | Jest/React Native Testing Library, SQLite integration, generated HTTP fixtures, Maestro iOS/Android device E2E |
-| Operations | OpenTofu validation/plan, image/SBOM/dependency scan, migration rehearsal, restore/reconciliation, queue/DLQ and alert/runbook exercise |
+| Operations | Provider runtime plan/apply evidence, image/SBOM/dependency scan, migration rehearsal, restore/reconciliation, queue/DLQ and alert/runbook exercise |
 | User understanding | moderated comprehension sessions for multi-payer, simplification, overpayment, and Settle all before public release |
 
 Use a test pyramid with property/invariant tests at the base and resettable device journeys at the top. Tests must create their own data and never rely on shared state, production identities, real OTPs, or push timing. A regression produces a targeted test before its fix.

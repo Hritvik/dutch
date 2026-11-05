@@ -63,7 +63,11 @@ Use private subnets, security groups limited to required caller/port pairs, VPC 
 4. Staging runs service, queue/outbox, contract, device E2E, restore/reconciliation, and observability checks. Production promotion is a reviewed deployment of the already-tested image digest—not a rebuild.
 5. Roll back application images only when their database/API/event contracts remain compatible. Financial/source migrations are forward-repaired by an additive migration or governed correction command, never a database rewrite.
 
-EAS manages mobile development, preview, staging, and production build/update channels. Every build/update records Git commit, EAS build/update ID, runtime version, channel, app version, API/event compatibility range, environment, test evidence, approver, and rollback/forward-repair owner. OTA updates are runtime-version-gated, first promoted through staging/device validation, and disabled/rolled back only to a previously compatible bundle.
+Dutch launches as a Super App module (ADR 0011): the host owns the published binary,
+signing, store records, review, and rollout, while Dutch owns the module and its
+portability to a standalone shell later. EAS profiles remain in the repository for that
+later standalone phase and are not a launch gate. When a Dutch-owned binary is used, EAS
+manages mobile development, preview, staging, and production build/update channels. Every build/update records Git commit, EAS build/update ID, runtime version, channel, app version, API/event compatibility range, environment, test evidence, approver, and rollback/forward-repair owner. OTA updates are runtime-version-gated, first promoted through staging/device validation, and disabled/rolled back only to a previously compatible bundle.
 
 ## Observability and alerts
 
@@ -91,6 +95,6 @@ Dashboards distinguish authoritative Ledger correctness from eventual notificati
 
 1. Provider plan and apply evidence referenced from the runtime contract; image digest/SBOM/dependency/security evidence retained; no secret in build/log/config output.
 2. Backward-compatible migration rehearsal and current/previous mobile runtime/API/event compatibility pass.
-3. iOS and Android staging device journeys pass on the exact EAS runtime/channel; OTA provenance is recorded.
+3. iOS and Android device journeys pass on the exact host build containing the Dutch module; the host build identity and Dutch module version are recorded, and the module renders in a minimal test shell.
 4. RDS restore plus projection/outbox reconciliation, queue/DLQ replay, alert routing, and incident runbook exercises meet RPO/RTO targets.
 5. WAF/rate-limit, task/database least privilege, TLS, backup, export lifecycle, and logging-redaction checks pass.

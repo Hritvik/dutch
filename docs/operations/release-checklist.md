@@ -30,9 +30,18 @@
       token data in logs, contracts, or fixtures.
 - [ ] Accessibility (labels, focus order, contrast, reduced motion), performance
       (cold start, list scroll, sync p95), and security review evidence attached.
-- [ ] Android and iOS acceptance builds from the recorded artifact digest; EAS
-      development/preview/production profiles exercised.
-- [ ] Support/legal pages, store metadata, and data deletion contacts approved.
+- [ ] Dutch module accepted on a host build (ADR 0011): signed-out, profile-required,
+      mapping-unavailable, pending-command, and active states behave in the shell.
+- [ ] Module portability check: the Dutch module renders in a minimal test shell that
+      provides only the declared host interface.
+- [ ] Host release cadence and the path for shipping a Dutch defect fix are known and
+      recorded; the host build identity containing each Dutch module version is noted.
+- [ ] Store data declaration covering Dutch's financial and contact data approved, and
+      the store-level account-deletion entry reaches Dutch's own deletion flow.
+- [ ] Support/legal pages approved. Store metadata, signing, and submission are the
+      host's at launch and are not Dutch gates (ADR 0011).
+- [ ] Phase 2 only: standalone Dutch bundle, EAS development/preview/production
+      profiles, and Dutch store submission.
 - [ ] Rollback/forward-repair plan and on-call routing confirmed.
 
 ## Promotion

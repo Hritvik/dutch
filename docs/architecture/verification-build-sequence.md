@@ -63,7 +63,7 @@ Exit: duplicate/replayed events are harmless, failed push does not affect financ
 
 ### Slice 7 — production readiness and controlled launch
 
-Consume an accepted production runtime (private networking, isolated restorable storage, FIFO delivery, secret injection, digest deployment) from a platform provider, plus scaling/cost limits, backup/restore, migration compatibility, EAS promotion, device acceptance, accessibility, performance, security, legal/support, and comprehension evidence. Launch only after staged release gates pass.
+Consume an accepted production runtime (private networking, isolated restorable storage, FIFO delivery, secret injection, digest deployment) from a platform provider, plus scaling/cost limits, backup/restore, migration compatibility, host-build device acceptance (the Dutch module inside the Super App shell, ADR 0011), accessibility, performance, security, legal/support, and comprehension evidence. Launch only after staged release gates pass.
 
 Exit: approved release record includes image/update/runtime/API/event/migration versions, tests, restore/outbox evidence, alert/runbook evidence, approver, and rollback/forward-repair owner.
 

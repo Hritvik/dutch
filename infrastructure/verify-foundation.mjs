@@ -21,6 +21,7 @@ const requiredFiles = [
   "infrastructure/local/init/01-create-service-databases.sh",
   "infrastructure/local/README.md",
   "docs/adr/0010-delegate-production-runtime-provisioning.md",
+  "docs/adr/0011-ship-inside-super-app-before-standalone.md",
   "infrastructure/provenance/release-record.schema.json",
   ".github/workflows/quality.yml",
   "tools/scan-secrets.mjs",
@@ -127,6 +128,15 @@ export function inspectFoundation(repositoryRoot) {
   for (const alert of ["OutboxUnpublishedLag", "OutboxDeadLetter",
     "NotificationDeliveryFailures", "GatewayRateLimitShare"]) {
     if (!alerts.includes(alert)) issues.push(`alert rules lack ${alert}`);
+  }
+  const checklist = fs.readFileSync(
+    path.join(repositoryRoot, "docs/operations/release-checklist.md"),
+    "utf8",
+  );
+  for (const expected of ["host build", "minimal test shell", "Phase 2 only"]) {
+    if (!checklist.includes(expected)) {
+      issues.push(`release checklist lacks the ${expected} gate`);
+    }
   }
   const eas = JSON.parse(fs.readFileSync(path.join(repositoryRoot, "apps/mobile/eas.json"), "utf8"));
   for (const profile of ["development", "preview", "production"]) {

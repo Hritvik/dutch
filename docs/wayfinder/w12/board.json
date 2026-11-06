@@ -122,7 +122,7 @@
       "id": "W12-F",
       "title": "Finalize accepted W-12 status",
       "kind": "integration",
-      "status": "ready",
+      "status": "integrated",
       "packet": "packets/W12-F.md",
       "evidence": "evidence/W12-F.md",
       "depends_on": [
@@ -139,16 +139,16 @@
       "checkpoint": null,
       "central": {
         "task": "dutch-ref/W12-F",
-        "revision": 1,
-        "status": "ready",
+        "revision": 6,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-05T04:59:49Z"
+        "synced_at": "2026-11-06T05:23:21Z"
       }
     }
   ],
   "central_registry": {
     "home": "capabilities/work",
     "board": "dutch.ref.w12",
-    "synced_at": "2026-11-05T04:59:49Z"
+    "synced_at": "2026-11-06T05:23:21Z"
   }
 }

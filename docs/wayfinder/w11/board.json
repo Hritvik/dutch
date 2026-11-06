@@ -15,7 +15,7 @@
       "id": "W11-A",
       "title": "Reshape the UMS schema for app-scoped onboarding",
       "kind": "implementation",
-      "status": "reviewed",
+      "status": "integrated",
       "packet": "packets/W11-A.md",
       "evidence": "evidence/W11-A.md",
       "depends_on": [],
@@ -64,17 +64,17 @@
       ],
       "central": {
         "task": "dutch-ref/W11-A",
-        "revision": 0,
-        "status": "reviewed",
+        "revision": 1,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-06T05:23:21Z"
       }
     },
     {
       "id": "W11-B",
       "title": "Consume onboarding idempotently",
       "kind": "implementation",
-      "status": "reviewed",
+      "status": "integrated",
       "packet": "packets/W11-B.md",
       "evidence": "evidence/W11-B.md",
       "depends_on": [],
@@ -122,17 +122,17 @@
       ],
       "central": {
         "task": "dutch-ref/W11-B",
-        "revision": 0,
-        "status": "reviewed",
+        "revision": 1,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-06T05:23:21Z"
       }
     },
     {
       "id": "W11-C",
       "title": "Prove idempotency and fault handling",
       "kind": "integration",
-      "status": "green",
+      "status": "integrated",
       "packet": "packets/W11-C.md",
       "evidence": "evidence/W11-C.md",
       "depends_on": [
@@ -171,10 +171,10 @@
       "implementation_agent": "OPENCODE-DS41F",
       "central": {
         "task": "dutch-ref/W11-C",
-        "revision": 0,
-        "status": "green",
+        "revision": 2,
+        "status": "integrated",
         "claim": null,
-        "synced_at": "2026-11-01T00:00:00Z"
+        "synced_at": "2026-11-06T05:23:21Z"
       }
     },
     {
@@ -282,6 +282,6 @@
   "central_registry": {
     "home": "capabilities/work",
     "board": "dutch.ref.w11",
-    "synced_at": "2026-11-01T00:00:00Z"
+    "synced_at": "2026-11-06T05:23:21Z"
   }
 }

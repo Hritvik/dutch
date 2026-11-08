@@ -54,9 +54,9 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !(path.equals("/api/v1/me")
-                || path.startsWith("/api/v1/me/")
-                || path.startsWith("/api/v1/ledger")
+        // /api/v1/me* is translated by MeController against canonical UMS; it is not a
+        // transparent forward.
+        return !(path.startsWith("/api/v1/ledger")
                 || path.startsWith("/api/v1/groups")
                 || path.startsWith("/api/v1/notifications")
                 || path.startsWith("/api/v1/reports")

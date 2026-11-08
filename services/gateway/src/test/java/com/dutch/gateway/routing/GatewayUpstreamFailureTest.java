@@ -27,7 +27,7 @@ class GatewayUpstreamFailureTest {
     @Test
     @WithMockUser
     void returns_the_published_unavailable_envelope_when_ums_is_down() throws Exception {
-        mockMvc.perform(get("/api/v1/me").header(CorrelationId.HEADER, "cor_0123456789012345"))
+        mockMvc.perform(get("/api/v1/groups").header(CorrelationId.HEADER, "cor_0123456789012345"))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(header().string(CorrelationId.HEADER, "cor_0123456789012345"))
                 .andExpect(jsonPath("$.error.code").value("service_unavailable"))

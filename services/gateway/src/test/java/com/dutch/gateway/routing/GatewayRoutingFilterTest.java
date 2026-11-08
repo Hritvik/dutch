@@ -18,8 +18,9 @@ class GatewayRoutingFilterTest {
     void only_filters_the_owned_surfaces() {
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/actuator/health"))).isTrue();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/other"))).isTrue();
-        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/me"))).isFalse();
-        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/me/profile-state"))).isFalse();
+        // /api/v1/me* is translated by MeController, not forwarded.
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/me"))).isTrue();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/me/profile-state"))).isTrue();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/ledger/home"))).isFalse();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET",
                 "/api/v1/notifications/devices"))).isFalse();
@@ -27,12 +28,12 @@ class GatewayRoutingFilterTest {
 
     @Test
     void rejects_a_traversal_path_before_calling_upstream() throws Exception {
-        assertRejected("/api/v1/me/../secret");
+        assertRejected("/api/v1/groups/../secret");
     }
 
     @Test
     void rejects_an_encoded_traversal_path() throws Exception {
-        assertRejected("/api/v1/me/%2e%2e/secret");
+        assertRejected("/api/v1/groups/%2e%2e/secret");
     }
 
     private void assertRejected(String path) throws Exception {

@@ -39,6 +39,9 @@ public class LedgerSecurityConfiguration {
                         .requestMatchers("/api/v1/ledger/**").authenticated()
                         .requestMatchers("/api/v1/reports/**").authenticated()
                         .requestMatchers("/api/v1/privacy/**").authenticated()
+                        // The UMS report ingress authenticates with a service token in the
+                        // controller, not a Dutch user credential.
+                        .requestMatchers("/internal/ums/**", "/internal/members/**").permitAll()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .exceptionHandling(exceptions -> exceptions

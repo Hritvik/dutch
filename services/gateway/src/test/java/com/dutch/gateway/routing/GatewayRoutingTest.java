@@ -71,34 +71,21 @@ class GatewayRoutingTest {
                 .expiresAt(Instant.now().plusSeconds(60))
                 .build());
 
-        mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer valid-token"))
+        mockMvc.perform(get("/api/v1/ledger/home").header("Authorization", "Bearer valid-token"))
                 .andExpect(status().isOk());
-    }
-
-    @Test
-    @WithMockUser
-    void forwards_an_authenticated_profile_request_to_ums() throws Exception {
-        mockMvc.perform(get("/api/v1/me/profile-state")
-                        .header(CorrelationId.HEADER, "cor_0123456789012345"))
-                .andExpect(status().isOk())
-                .andExpect(header().string(CorrelationId.HEADER, "cor_0123456789012345"))
-                .andExpect(jsonPath("$.data.state").value("PROFILE_REQUIRED"));
-
-        assertThat(UMS.lastPath.get()).isEqualTo("/api/v1/me/profile-state");
-        assertThat(UMS.lastCorrelation.get()).isEqualTo("cor_0123456789012345");
     }
 
     @Test
     @WithMockUser
     void preserves_method_query_and_body() throws Exception {
-        mockMvc.perform(post("/api/v1/me/anything?mode=full")
+        mockMvc.perform(post("/api/v1/groups/anything?mode=full")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"a\":1}"))
                 .andExpect(status().isOk());
 
-        assertThat(UMS.lastMethod.get()).isEqualTo("POST");
-        assertThat(UMS.lastQuery.get()).isEqualTo("mode=full");
-        assertThat(UMS.lastBody.get()).isEqualTo("{\"a\":1}");
+        assertThat(LEDGER.lastMethod.get()).isEqualTo("POST");
+        assertThat(LEDGER.lastQuery.get()).isEqualTo("mode=full");
+        assertThat(LEDGER.lastBody.get()).isEqualTo("{\"a\":1}");
     }
 
     @Test
@@ -123,17 +110,17 @@ class GatewayRoutingTest {
     @Test
     @WithMockUser
     void regenerates_an_unsafe_correlation_id_and_keeps_the_body_valid() throws Exception {
-        mockMvc.perform(get("/api/v1/me").header(CorrelationId.HEADER, "bad\"value"))
+        mockMvc.perform(get("/api/v1/ledger/home").header(CorrelationId.HEADER, "bad\"value"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(CorrelationId.HEADER,
                         org.hamcrest.Matchers.matchesPattern("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")))
-                .andExpect(jsonPath("$.data.state").exists());
+                .andExpect(jsonPath("$.data.scope").exists());
     }
 
     @Test
     @WithMockUser
     void strips_headers_named_by_connection() throws Exception {
-        mockMvc.perform(get("/api/v1/me")
+        mockMvc.perform(get("/api/v1/groups")
                         .header("Connection", "X-Secret")
                         .header("X-Secret", "leak"))
                 .andExpect(status().isOk());

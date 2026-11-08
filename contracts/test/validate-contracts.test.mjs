@@ -207,7 +207,7 @@ test('pins the UMS association report schema and its accepted and rejected fixtu
   const rejections = [
     ['fixtures/association-report-invalid-display.json', /additional properties/i],
     ['fixtures/association-report-invalid-environment.json', /environment|allowed values/i],
-    ['fixtures/association-report-invalid-tombstone.json', /retiredGeneration|must not|not |anyOf/i]
+    ['fixtures/association-report-invalid-tombstone.json', /must NOT be valid|then" schema/i]
   ];
   for (const [fixture, expected] of rejections) {
     const result = await validateUmsAssociationReportFixture(contractsRoot, fixture);

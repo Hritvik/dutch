@@ -213,7 +213,7 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
     }
 
     @Test
-    void a_slow_lower_revision_cannot_overwrite_a_newer_restrictive_fact() throws Exception {
+    void concurrent_revisions_leave_the_highest_applied() throws Exception {
         String subject = "aps_race_01234567890123456789";
         map(subject, "mem_race_012345678901", 1);
         consume(ready(subject, 1, "evt_race_00000000000001", 1L));
@@ -237,7 +237,7 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
     }
 
     @Test
-    void two_concurrent_deliveries_of_one_report_apply_once() throws Exception {
+    void concurrent_duplicate_delivery_is_a_smoke_test_for_the_insert_race() throws Exception {
         String subject = "aps_conc_01234567890123456789";
         MemberAssociationReport report = ready(subject, 1, "evt_conc_00000000000001", 1L);
 
@@ -315,5 +315,70 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         assertThatThrownBy(() -> consume(live("evt_pr_0000000000000001", subject, 1,
                 "PROFILE_READY", "ACTIVE", null, 1L, "6")))
                 .isInstanceOf(MemberMappingConflictException.class);
+    }
+
+    @Test
+    void a_report_for_another_environment_is_refused() {
+        String subject = "aps_env_012345678901234567890";
+        MemberAssociationReport foreign = new MemberAssociationReport(
+                "evt_env_0000000000000001", subject, subject, "dutch-development", "staging",
+                1, "PROFILE_READY", "ACTIVE", null, 1L, "5", null, false, NOW);
+
+        assertThatThrownBy(() -> consume(foreign))
+                .isInstanceOf(ForeignAssociationReportException.class);
+    }
+
+    @Test
+    void a_new_generation_is_accepted_and_a_late_erasure_below_it_is_refused() {
+        String subject = "aps_life_01234567890123456";
+        map(subject, "mem_life_012345678901", 1);
+        consume(erased("evt_life_0000000000000001", subject, 1, 5L));
+
+        consume(live("evt_life_0000000000000002", subject, 2, "PROFILE_READY", "ACTIVE",
+                "REOPENED", 6L, "9"));
+        assertThat(resolve(subject)).isPresent();
+
+        assertThatThrownBy(() -> consume(erased("evt_life_0000000000000003", subject, 3, 4L)))
+                .isInstanceOf(RetiredGenerationException.class);
+        assertThat(resolve(subject)).isPresent();
+    }
+
+    @Test
+    void data_subject_rights_survive_a_readiness_regression_and_outage() {
+        String outage = "aps_rights_0123456789012345678";
+        map(outage, "mem_rights_0123456789", 1);
+        assertThat(resolve(outage)).isEmpty();
+        java.util.Optional<MemberId> outageRights = transactions.execute(
+                status -> resolver.resolveForDataSubjectRights(outage));
+        assertThat(outageRights).isPresent();
+
+        String regressed = "aps_rights_1123456789012345678";
+        map(regressed, "mem_rights_1123456789", 1);
+        consume(ready(regressed, 1, "evt_rights_00000000000001", 1L));
+        consume(live("evt_rights_00000000000002", regressed, 2, "PROFILE_REQUIRED",
+                "ACTIVE", null, 1L, "1"));
+        assertThat(resolve(regressed)).isEmpty();
+        java.util.Optional<MemberId> regressedRights = transactions.execute(
+                status -> resolver.resolveForDataSubjectRights(regressed));
+        assertThat(regressedRights).isPresent();
+    }
+
+    @Test
+    void the_outage_direction_is_countable() {
+        String member = "mem_gauge_0123456789";
+        String subject = "aps_gauge_0123456789012345678";
+        map(subject, member, 1);
+
+        assertThat(consumer.unmappedReports()).contains(member);
+        consume(ready(subject, 1, "evt_gauge_00000000000001", 1L));
+        assertThat(consumer.unmappedReports()).doesNotContain(member);
+
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry registry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        new UnreconciledBindingMetrics(registry, consumer);
+        assertThat(registry.get("dutch.ledger.association.unmapped").gauge().value())
+                .isGreaterThanOrEqualTo(0.0d);
+        assertThat(registry.get("dutch.ledger.association.unreconciled").gauge().value())
+                .isGreaterThanOrEqualTo(0.0d);
     }
 }

@@ -24,3 +24,9 @@ management:
 dutch:
   outbox:
     service-token: ${DUTCH_OUTBOX_SERVICE_TOKEN:}
+  ums:
+    # Scope guard for the UMS association report. A deployment that leaves these at
+    # their development defaults would reject every real report and deny Ledger
+    # access, so each environment must set them explicitly.
+    app-registration-id: ${DUTCH_UMS_APP_REGISTRATION_ID:dutch-development}
+    environment: ${DUTCH_UMS_ENVIRONMENT:development}

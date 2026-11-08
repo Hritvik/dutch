@@ -75,7 +75,9 @@ public class JdbcMemberAssociationReportConsumer {
         // instead of failing the transaction: an at-least-once redelivery is not an error.
         Existing winner = lock(report.appSubject());
         if (winner == null) {
-            throw new IllegalStateException("association report could not be applied");
+            // The only remaining unique key is the event id: it is already used for
+            // another subject, which is the contract's "reused event id" conflict.
+            throw new MemberMappingConflictException();
         }
         return applyToExisting(report, winner);
     }

@@ -80,12 +80,15 @@ Financial access stays gated; the export path does not.
 | Concurrent duplicate delivery applies once | `two_concurrent_deliveries_of_one_report_apply_once` |
 | Erasure watermark never moves backwards | `an_erasure_watermark_never_moves_backwards`, `an_erasure_below_the_live_generation_is_refused` |
 | Closure and deletion-pending deny financial access | `closure_and_pending_deletion_deny_access` |
-| A report for another app registration is refused | `a_report_for_another_app_registration_is_refused` |
+| A report for another app registration is refused | `a_report_for_another_app_registration_is_refused`, `a_report_for_another_environment_is_refused` |
+| A new generation is accepted; a late erasure below it is refused | `a_new_generation_is_accepted_and_a_late_erasure_below_it_is_refused` |
+| Data-subject rights survive readiness regression and outage | `data_subject_rights_survive_a_readiness_regression_and_outage` |
+| The outage direction is countable | `the_outage_direction_is_countable` |
 
 ## Verification
 
 ```bash
-./gradlew :services:ledger:test        # 215 tests, 0 failures
+./gradlew :services:ledger:test        # 219 tests, 0 failures
 cd contracts && npm test               # 19/19
 ./gradlew verifyServiceBoundaries verifyContracts
 ```
@@ -100,6 +103,12 @@ cd contracts && npm test               # 19/19
   is superseded. A journal (as `member_sync_journal` does for mapping facts) would
   make redelivery detection exact; deferred because the revision guard already
   prevents regression.
+- **Scope configuration.** `dutch.ums.app-registration-id` and `dutch.ums.environment`
+  default to `dutch-development` / `development`. Every non-development deployment
+  must set `DUTCH_UMS_APP_REGISTRATION_ID` and `DUTCH_UMS_ENVIRONMENT`; leaving the
+  defaults in staging or production fails closed by rejecting every report, which
+  denies all Ledger access. The properties are declared in the ledger
+  `application.yaml` with those environment variable placeholders.
 - **Death signal for a refused generation.** `RetiredGenerationException` is not
   surfaced as a metric; a subject blocked by a renumbered generation would only be
   visible in logs.

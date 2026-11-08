@@ -7,12 +7,15 @@ CREATE TABLE ums_profile_binding (
         ('DELETION_REQUESTED', 'DELETION_CANCELLED', 'CLOSED', 'ERASED', 'REOPENED')),
     generation BIGINT CHECK (generation > 0),
     retired_generation BIGINT CHECK (retired_generation > 0),
+    profile_revision TEXT,
     content_obligation BOOLEAN NOT NULL,
+    app_registration_id TEXT NOT NULL,
+    environment TEXT NOT NULL CHECK (environment IN ('development', 'test', 'staging', 'production')),
     source_event_id TEXT NOT NULL UNIQUE,
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT ums_profile_binding_tombstone_shape CHECK (
         (lifecycle_state = 'ERASED' AND retired_generation IS NOT NULL AND generation IS NULL)
-        OR (lifecycle_state <> 'ERASED' AND retired_generation IS NULL)
+        OR (lifecycle_state <> 'ERASED' AND retired_generation IS NULL AND generation IS NOT NULL)
     )
 );
 

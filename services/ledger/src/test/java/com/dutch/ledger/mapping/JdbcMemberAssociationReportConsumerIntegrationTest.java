@@ -40,7 +40,7 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
                 .migrate();
         jdbc = new JdbcTemplate(new DriverManagerDataSource(
                 database.getJdbcUrl(), database.getUsername(), database.getPassword()));
-        consumer = new JdbcMemberAssociationReportConsumer(jdbc);
+        consumer = new JdbcMemberAssociationReportConsumer(jdbc, "dutch-development", "test");
         mappings = new JdbcMemberMappingConsumer(jdbc);
         resolver = new JdbcMemberResolver(jdbc);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(jdbc.getDataSource()));
@@ -73,8 +73,8 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         consume(ready(subject, 1, "evt_regress_0000000000001", 1L));
         assertThat(resolve(subject)).contains(new MemberId(member));
 
-        consume(new MemberAssociationReport("evt_regress_0000000000002", subject, 2,
-                "PROFILE_REQUIRED", "ACTIVE", null, 1L, "1", null, false, NOW));
+        consume(live("evt_regress_0000000000002", subject, 2, "PROFILE_REQUIRED",
+                "ACTIVE", null, 1L, "1"));
         assertThat(resolve(subject)).isEmpty();
     }
 
@@ -84,20 +84,17 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         map(subject, "mem_erased_0123456789", 1);
         consume(ready(subject, 1, "evt_erased_00000000000001", 1L));
 
-        consume(new MemberAssociationReport("evt_erased_00000000000002", subject, 2,
-                "PROFILE_REQUIRED", "ERASED", "ERASED", null, null, 1L, false, NOW));
+        consume(erased("evt_erased_00000000000002", subject, 2, 1L));
         assertThat(resolve(subject)).isEmpty();
     }
 
     @Test
     void a_live_report_reusing_a_retired_generation_is_refused() {
         String subject = "aps_retired_01234567890123456";
-        consume(new MemberAssociationReport("evt_retired_0000000000001", subject, 1,
-                "PROFILE_REQUIRED", "ERASED", "ERASED", null, null, 3L, false, NOW));
+        consume(erased("evt_retired_0000000000001", subject, 1, 3L));
 
-        MemberAssociationReport resurrection = new MemberAssociationReport(
-                "evt_retired_0000000000002", subject, 2, "PROFILE_READY", "ACTIVE",
-                "REOPENED", 3L, "9", null, false, NOW);
+        MemberAssociationReport resurrection = live("evt_retired_0000000000002", subject, 2,
+                "PROFILE_READY", "ACTIVE", "REOPENED", 3L, "9");
 
         assertThatThrownBy(() -> consume(resurrection))
                 .isInstanceOf(RetiredGenerationException.class);
@@ -114,7 +111,8 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         assertThat(consume(report)).isTrue();
         assertThat(consume(report)).isFalse();
         // a fresh consumer is what a process restart looks like
-        JdbcMemberAssociationReportConsumer restarted = new JdbcMemberAssociationReportConsumer(jdbc);
+        JdbcMemberAssociationReportConsumer restarted =
+                new JdbcMemberAssociationReportConsumer(jdbc, "dutch-development", "test");
         assertThat(consume(restarted, report)).isFalse();
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM ums_profile_binding WHERE app_subject = ?",
@@ -127,9 +125,8 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         map(subject, "mem_stale_0123456789", 1);
         consume(ready(subject, 5, "evt_stale_00000000000001", 1L));
 
-        boolean applied = consume(new MemberAssociationReport(
-                "evt_stale_00000000000002", subject, 4, "PROFILE_REQUIRED", "ACTIVE",
-                null, 1L, "1", null, false, NOW));
+        boolean applied = consume(live("evt_stale_00000000000002", subject, 4,
+                "PROFILE_REQUIRED", "ACTIVE", null, 1L, "1"));
 
         assertThat(applied).isFalse();
         assertThat(resolve(subject)).isPresent();
@@ -140,9 +137,8 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         String subject = "aps_conflict_01234567890123";
         consume(ready(subject, 1, "evt_conflict_000000000001", 1L));
 
-        MemberAssociationReport conflicting = new MemberAssociationReport(
-                "evt_conflict_000000000001", subject, 2, "PROFILE_REQUIRED", "ACTIVE",
-                null, 1L, "1", null, false, NOW);
+        MemberAssociationReport conflicting = live("evt_conflict_000000000001", subject, 2,
+                "PROFILE_REQUIRED", "ACTIVE", null, 1L, "1");
 
         assertThatThrownBy(() -> consume(conflicting))
                 .isInstanceOf(MemberMappingConflictException.class);
@@ -179,8 +175,23 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
 
     private static MemberAssociationReport ready(String subject, long revision, String eventId,
                                                  Long generation) {
-        return new MemberAssociationReport(eventId, subject, revision, "PROFILE_READY",
-                "ACTIVE", null, generation, "5", null, false, NOW);
+        return live(eventId, subject, revision, "PROFILE_READY", "ACTIVE", null, generation, "5");
+    }
+
+    private static MemberAssociationReport live(String eventId, String subject, long revision,
+                                                String profileState, String lifecycleState,
+                                                String reason, Long generation,
+                                                String profileRevision) {
+        return new MemberAssociationReport(eventId, subject, subject, "dutch-development", "test",
+                revision, profileState, lifecycleState, reason, generation, profileRevision,
+                null, false, NOW);
+    }
+
+    private static MemberAssociationReport erased(String eventId, String subject, long revision,
+                                                  Long retiredGeneration) {
+        return new MemberAssociationReport(eventId, subject, subject, "dutch-development", "test",
+                revision, "PROFILE_REQUIRED", "ERASED", "ERASED", null, null,
+                retiredGeneration, false, NOW);
     }
 
     private static boolean consume(MemberAssociationReport report) {
@@ -199,5 +210,110 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
 
     private static java.util.Optional<MemberId> resolve(String subject) {
         return transactions.execute(status -> resolver.resolve(subject));
+    }
+
+    @Test
+    void a_slow_lower_revision_cannot_overwrite_a_newer_restrictive_fact() throws Exception {
+        String subject = "aps_race_01234567890123456789";
+        map(subject, "mem_race_012345678901", 1);
+        consume(ready(subject, 1, "evt_race_00000000000001", 1L));
+
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var slower = pool.submit(() -> consume(live("evt_race_00000000000002", subject, 2,
+                    "PROFILE_READY", "ACTIVE", null, 1L, "5")));
+            var faster = pool.submit(() -> consume(live("evt_race_00000000000003", subject, 3,
+                    "PROFILE_REQUIRED", "ACTIVE", null, 1L, "5")));
+            slower.get();
+            faster.get();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject(
+                "SELECT binding_revision FROM ums_profile_binding WHERE app_subject = ?",
+                Long.class, subject)).isEqualTo(3L);
+        assertThat(resolve(subject)).isEmpty();
+    }
+
+    @Test
+    void two_concurrent_deliveries_of_one_report_apply_once() throws Exception {
+        String subject = "aps_conc_01234567890123456789";
+        MemberAssociationReport report = ready(subject, 1, "evt_conc_00000000000001", 1L);
+
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first = pool.submit(() -> consume(report));
+            var second = pool.submit(() -> consume(report));
+            first.get();
+            second.get();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM ums_profile_binding WHERE app_subject = ?",
+                Integer.class, subject)).isEqualTo(1);
+    }
+
+    @Test
+    void an_erasure_watermark_never_moves_backwards() {
+        String subject = "aps_water_0123456789012345678";
+        consume(erased("evt_water_00000000000001", subject, 1, 5L));
+
+        assertThatThrownBy(() -> consume(erased("evt_water_00000000000002", subject, 2, 2L)))
+                .isInstanceOf(RetiredGenerationException.class);
+        assertThat(jdbc.queryForObject(
+                "SELECT retired_generation FROM ums_profile_binding WHERE app_subject = ?",
+                Long.class, subject)).isEqualTo(5L);
+    }
+
+    @Test
+    void an_erasure_below_the_live_generation_is_refused() {
+        String subject = "aps_below_012345678901234567";
+        consume(ready(subject, 1, "evt_below_00000000000001", 4L));
+
+        assertThatThrownBy(() -> consume(erased("evt_below_00000000000002", subject, 2, 2L)))
+                .isInstanceOf(RetiredGenerationException.class);
+    }
+
+    @Test
+    void a_report_for_another_app_registration_is_refused() {
+        String subject = "aps_scope_0123456789012345678";
+        MemberAssociationReport foreign = new MemberAssociationReport(
+                "evt_scope_00000000000001", subject, subject, "dutch-production", "test",
+                1, "PROFILE_READY", "ACTIVE", null, 1L, "5", null, false, NOW);
+
+        assertThatThrownBy(() -> consume(foreign))
+                .isInstanceOf(ForeignAssociationReportException.class);
+    }
+
+    @Test
+    void closure_and_pending_deletion_deny_access() {
+        String closedSubject = "aps_closed_012345678901234567";
+        map(closedSubject, "mem_closed_0123456789", 1);
+        consume(ready(closedSubject, 1, "evt_closed_0000000000001", 1L));
+        assertThat(resolve(closedSubject)).isPresent();
+
+        consume(live("evt_closed_0000000000002", closedSubject, 2, "PROFILE_READY",
+                "CLOSED", "CLOSED", 1L, "5"));
+        assertThat(resolve(closedSubject)).isEmpty();
+
+        String pendingSubject = "aps_pending_01234567890123456";
+        map(pendingSubject, "mem_pending_0123456789", 1);
+        consume(ready(pendingSubject, 1, "evt_pending_0000000000001", 1L));
+        consume(live("evt_pending_0000000000002", pendingSubject, 2, "PROFILE_READY",
+                "DELETION_PENDING", "DELETION_REQUESTED", 1L, "5"));
+        assertThat(resolve(pendingSubject)).isEmpty();
+    }
+
+    @Test
+    void a_reused_event_id_with_another_profile_revision_is_a_conflict() {
+        String subject = "aps_pr_012345678901234567890";
+        consume(ready(subject, 1, "evt_pr_0000000000000001", 1L));
+
+        assertThatThrownBy(() -> consume(live("evt_pr_0000000000000001", subject, 1,
+                "PROFILE_READY", "ACTIVE", null, 1L, "6")))
+                .isInstanceOf(MemberMappingConflictException.class);
     }
 }

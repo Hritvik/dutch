@@ -38,4 +38,16 @@ public class JdbcMemberResolver implements MemberResolver {
                 """, String.class, appSubject);
         return members.stream().findFirst().map(MemberId::new);
     }
+
+    @Override
+    public Optional<MemberId> resolveForDataSubjectRights(String appSubject) {
+        if (appSubject == null || !appSubject.startsWith("aps_")) {
+            return Optional.empty();
+        }
+        List<String> members = jdbc.queryForList("""
+                SELECT member_id FROM app_subject_member_mapping
+                WHERE app_subject = ? AND lifecycle_state = 'ACTIVE'
+                """, String.class, appSubject);
+        return members.stream().findFirst().map(MemberId::new);
+    }
 }

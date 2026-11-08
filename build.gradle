@@ -80,6 +80,7 @@ tasks.register('verifyContracts', Exec) {
 	workingDir layout.projectDirectory.dir('contracts')
 	commandLine 'npm', 'run', 'validate'
 	inputs.dir layout.projectDirectory.dir('contracts/http')
+	inputs.dir layout.projectDirectory.dir('contracts/imported')
 	inputs.dir layout.projectDirectory.dir('contracts/events')
 	inputs.file layout.projectDirectory.file('contracts/validate-contracts.mjs')
 	outputs.upToDateWhen { false }

@@ -2,7 +2,9 @@ package com.dutch.ledger.mapping;
 
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,89 +15,112 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The consumer never creates a member and never changes the mapping: it records
  * what UMS observed for an app subject so authorization can fail closed when the
  * profile regresses, is erased, or was never reported.
+ *
+ * <p>Ordering is the binding revision only. The subject row is locked before the
+ * revision is compared and the update repeats the revision predicate, so a slow
+ * lower revision cannot overwrite a newer or erased fact.
  */
 @Service
 public class JdbcMemberAssociationReportConsumer {
 
-    private final JdbcTemplate jdbc;
+    private static final Logger log =
+            LoggerFactory.getLogger(JdbcMemberAssociationReportConsumer.class);
 
-    public JdbcMemberAssociationReportConsumer(JdbcTemplate jdbc) {
+    private final JdbcTemplate jdbc;
+    private final String appRegistrationId;
+    private final String environment;
+
+    public JdbcMemberAssociationReportConsumer(
+            JdbcTemplate jdbc,
+            @Value("${dutch.ums.app-registration-id:dutch-development}") String appRegistrationId,
+            @Value("${dutch.ums.environment:development}") String environment) {
         this.jdbc = jdbc;
+        this.appRegistrationId = appRegistrationId;
+        this.environment = environment;
     }
 
     /**
      * @return true when the projection advanced, false for a duplicate or stale report
      * @throws MemberMappingConflictException when an event id is reused with another payload
      * @throws RetiredGenerationException when a live report reuses a generation UMS erased
+     * @throws ForeignAssociationReportException when the report targets another app or environment
      */
     @Transactional
     public boolean consume(MemberAssociationReport report) {
-        Optional<Existing> byEvent = jdbc.query("""
-                SELECT app_subject, binding_revision, profile_state, lifecycle_state,
-                       lifecycle_reason, generation, retired_generation, content_obligation
-                FROM ums_profile_binding WHERE source_event_id = ?
-                """, (result, index) -> new Existing(
-                result.getString("app_subject"),
-                result.getLong("binding_revision"),
-                result.getString("profile_state"),
-                result.getString("lifecycle_state"),
-                result.getString("lifecycle_reason"),
-                result.getObject("generation", Long.class),
-                result.getObject("retired_generation", Long.class),
-                result.getBoolean("content_obligation")), report.eventId()).stream().findFirst();
-        if (byEvent.isPresent()) {
-            Existing previous = byEvent.get();
+        if (!report.belongsTo(appRegistrationId, environment)) {
+            throw new ForeignAssociationReportException();
+        }
+        Existing locked = lock(report.appSubject());
+        if (locked != null) {
+            return applyToExisting(report, locked);
+        }
+
+        int inserted = jdbc.update("""
+                INSERT INTO ums_profile_binding
+                    (app_subject, binding_revision, profile_state, lifecycle_state,
+                     lifecycle_reason, generation, retired_generation, profile_revision,
+                     content_obligation, app_registration_id, environment, source_event_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                """, report.appSubject(), report.bindingRevision(), report.profileState(),
+                report.lifecycleState(), report.lifecycleReason(), report.generation(),
+                report.retiredGeneration(), report.profileRevision(), report.contentObligation(),
+                report.appRegistrationId(), report.environment(), report.eventId(),
+                Timestamp.from(report.occurredAt()));
+        if (inserted == 1) {
+            noteIfUnreconciled(report.appSubject());
+            return true;
+        }
+        // Another delivery won the insert race. Re-read under the lock and classify it
+        // instead of failing the transaction: an at-least-once redelivery is not an error.
+        Existing winner = lock(report.appSubject());
+        if (winner == null) {
+            throw new IllegalStateException("association report could not be applied");
+        }
+        return applyToExisting(report, winner);
+    }
+
+    private boolean applyToExisting(MemberAssociationReport report, Existing previous) {
+        if (previous.sourceEventId().equals(report.eventId())) {
             if (!previous.matches(report)) {
                 throw new MemberMappingConflictException();
             }
             return false;
         }
-
-        Optional<Existing> current = jdbc.query("""
-                SELECT app_subject, binding_revision, profile_state, lifecycle_state,
-                       lifecycle_reason, generation, retired_generation, content_obligation
-                FROM ums_profile_binding WHERE app_subject = ?
-                """, (result, index) -> new Existing(
-                result.getString("app_subject"),
-                result.getLong("binding_revision"),
-                result.getString("profile_state"),
-                result.getString("lifecycle_state"),
-                result.getString("lifecycle_reason"),
-                result.getObject("generation", Long.class),
-                result.getObject("retired_generation", Long.class),
-                result.getBoolean("content_obligation")), report.appSubject()).stream().findFirst();
-
-        if (current.isPresent()) {
-            Existing previous = current.get();
-            if (report.bindingRevision() <= previous.bindingRevision()) {
-                return false;
-            }
-            if (report.reusesRetiredGeneration(previous.retiredGeneration())) {
-                throw new RetiredGenerationException();
-            }
-            jdbc.update("""
-                    UPDATE ums_profile_binding
-                    SET binding_revision = ?, profile_state = ?, lifecycle_state = ?,
-                        lifecycle_reason = ?, generation = ?, retired_generation = ?,
-                        content_obligation = ?, source_event_id = ?, updated_at = ?
-                    WHERE app_subject = ?
-                    """, report.bindingRevision(), report.profileState(), report.lifecycleState(),
-                    report.lifecycleReason(), report.generation(), report.retiredGeneration(),
-                    report.contentObligation(), report.eventId(), Timestamp.from(report.occurredAt()),
-                    report.appSubject());
-            return true;
+        if (report.bindingRevision() <= previous.bindingRevision()) {
+            return false;
+        }
+        if (report.reusesRetiredGeneration(previous.retiredGeneration())) {
+            throw new RetiredGenerationException();
+        }
+        if (report.isErasure() && previous.retiredGeneration() != null
+                && report.retiredGeneration() < previous.retiredGeneration()) {
+            // An erasure watermark never moves backwards; a lower retired generation is
+            // either a delayed tombstone or a corrupt one.
+            throw new RetiredGenerationException();
+        }
+        if (report.isErasure() && previous.generation() != null
+                && report.retiredGeneration() < previous.generation()) {
+            // UMS cannot erase a generation it never assigned.
+            throw new RetiredGenerationException();
         }
 
-        jdbc.update("""
-                INSERT INTO ums_profile_binding
-                    (app_subject, binding_revision, profile_state, lifecycle_state,
-                     lifecycle_reason, generation, retired_generation, content_obligation,
-                     source_event_id, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, report.appSubject(), report.bindingRevision(), report.profileState(),
-                report.lifecycleState(), report.lifecycleReason(), report.generation(),
-                report.retiredGeneration(), report.contentObligation(), report.eventId(),
-                Timestamp.from(report.occurredAt()));
+        int updated = jdbc.update("""
+                UPDATE ums_profile_binding
+                SET binding_revision = ?, profile_state = ?, lifecycle_state = ?,
+                    lifecycle_reason = ?, generation = ?, retired_generation = ?,
+                    profile_revision = ?, content_obligation = ?, app_registration_id = ?,
+                    environment = ?, source_event_id = ?, updated_at = ?
+                WHERE app_subject = ? AND binding_revision < ?
+                """, report.bindingRevision(), report.profileState(), report.lifecycleState(),
+                report.lifecycleReason(), report.generation(), report.retiredGeneration(),
+                report.profileRevision(), report.contentObligation(), report.appRegistrationId(),
+                report.environment(), report.eventId(), Timestamp.from(report.occurredAt()),
+                report.appSubject(), report.bindingRevision());
+        if (updated == 0) {
+            return false;
+        }
+        noteIfUnreconciled(report.appSubject());
         return true;
     }
 
@@ -108,6 +133,50 @@ public class JdbcMemberAssociationReportConsumer {
                 """, String.class);
     }
 
+    /**
+     * Members that hold an active mapping but have no UMS report. This is the
+     * provider-outage shape: silence must not read as readiness, and it must be
+     * visible rather than inferred from a denial.
+     */
+    public List<String> unmappedReports() {
+        return jdbc.queryForList("""
+                SELECT m.member_id FROM app_subject_member_mapping m
+                LEFT JOIN ums_profile_binding b ON b.app_subject = m.app_subject
+                WHERE m.lifecycle_state = 'ACTIVE' AND b.app_subject IS NULL
+                ORDER BY m.member_id
+                """, String.class);
+    }
+
+    private void noteIfUnreconciled(String appSubject) {
+        Integer mapped = jdbc.queryForObject("""
+                SELECT count(*) FROM app_subject_member_mapping WHERE app_subject = ?
+                """, Integer.class, appSubject);
+        if (mapped != null && mapped == 0) {
+            log.warn("association report for {} has no Dutch member mapping", appSubject);
+        }
+    }
+
+    private Existing lock(String appSubject) {
+        return jdbc.query("""
+                SELECT app_subject, binding_revision, profile_state, lifecycle_state,
+                       lifecycle_reason, generation, retired_generation, profile_revision,
+                       content_obligation, app_registration_id, environment, source_event_id
+                FROM ums_profile_binding WHERE app_subject = ? FOR UPDATE
+                """, (result, index) -> new Existing(
+                result.getString("app_subject"),
+                result.getLong("binding_revision"),
+                result.getString("profile_state"),
+                result.getString("lifecycle_state"),
+                result.getString("lifecycle_reason"),
+                result.getObject("generation", Long.class),
+                result.getObject("retired_generation", Long.class),
+                result.getString("profile_revision"),
+                result.getBoolean("content_obligation"),
+                result.getString("app_registration_id"),
+                result.getString("environment"),
+                result.getString("source_event_id")), appSubject).stream().findFirst().orElse(null);
+    }
+
     private record Existing(
             String appSubject,
             long bindingRevision,
@@ -116,7 +185,11 @@ public class JdbcMemberAssociationReportConsumer {
             String lifecycleReason,
             Long generation,
             Long retiredGeneration,
-            boolean contentObligation) {
+            String profileRevision,
+            boolean contentObligation,
+            String appRegistrationId,
+            String environment,
+            String sourceEventId) {
 
         boolean matches(MemberAssociationReport report) {
             return appSubject.equals(report.appSubject())
@@ -126,7 +199,10 @@ public class JdbcMemberAssociationReportConsumer {
                     && java.util.Objects.equals(lifecycleReason, report.lifecycleReason())
                     && java.util.Objects.equals(generation, report.generation())
                     && java.util.Objects.equals(retiredGeneration, report.retiredGeneration())
-                    && contentObligation == report.contentObligation();
+                    && java.util.Objects.equals(profileRevision, report.profileRevision())
+                    && contentObligation == report.contentObligation()
+                    && appRegistrationId.equals(report.appRegistrationId())
+                    && environment.equals(report.environment());
         }
     }
 }

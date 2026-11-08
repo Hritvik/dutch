@@ -142,8 +142,10 @@ class JdbcExpenseServiceIntegrationTest {
         jdbc.update("""
                 INSERT INTO ums_profile_binding
                     (app_subject, binding_revision, profile_state, lifecycle_state,
-                     generation, retired_generation, content_obligation, source_event_id, updated_at)
-                VALUES (?, 1, 'PROFILE_READY', 'ACTIVE', 1, NULL, false, ?, now())
+                     generation, retired_generation, profile_revision, content_obligation,
+                     app_registration_id, environment, source_event_id, updated_at)
+                VALUES (?, 1, 'PROFILE_READY', 'ACTIVE', 1, NULL, '1', false,
+                        'dutch-development', 'test', ?, now())
                 """, subject, UUID.randomUUID().toString());
     }
 }

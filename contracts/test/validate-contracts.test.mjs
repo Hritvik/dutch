@@ -204,17 +204,19 @@ test('pins the UMS association report schema and its accepted and rejected fixtu
     contractsRoot, 'fixtures/association-report.json');
   assert.deepEqual(accepted, { valid: true, issues: [] });
 
-  for (const fixture of [
-    'fixtures/association-report-invalid-display.json',
-    'fixtures/association-report-invalid-environment.json',
-    'fixtures/association-report-invalid-tombstone.json'
-  ]) {
+  const rejections = [
+    ['fixtures/association-report-invalid-display.json', /additional properties/i],
+    ['fixtures/association-report-invalid-environment.json', /environment|allowed values/i],
+    ['fixtures/association-report-invalid-tombstone.json', /retiredGeneration|must not|not |anyOf/i]
+  ];
+  for (const [fixture, expected] of rejections) {
     const result = await validateUmsAssociationReportFixture(contractsRoot, fixture);
     assert.equal(result.valid, false, `${fixture} must be rejected`);
+    assert.match(result.issues.join('\n'), expected, `${fixture} must be rejected for its own reason`);
   }
 });
 
-test('the pinned UMS copy matches the recorded digests', async () => {
+test('guards the pinned UMS copy against drift', async () => {
   const pinned = await readFile(
     path.join(contractsRoot, 'imported/ums/PINNED.md'), 'utf8');
   const rows = [...pinned.matchAll(/\| `([^`]+)`(?: \(schema\))? \| `([a-f0-9]{64})` \|/g)];

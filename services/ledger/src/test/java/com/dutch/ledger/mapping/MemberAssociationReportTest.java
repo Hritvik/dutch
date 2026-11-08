@@ -13,8 +13,7 @@ class MemberAssociationReportTest {
 
     @Test
     void a_live_report_requires_generation_and_profile_revision() {
-        assertThatThrownBy(() -> new MemberAssociationReport("evt_unit_00000000000001", SUBJECT,
-                1, "PROFILE_READY", "ACTIVE", null, null, "5", null, false, NOW))
+        assertThatThrownBy(() -> live("PROFILE_READY", "ACTIVE", null, "5"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("generation and profileRevision");
     }
@@ -22,7 +21,8 @@ class MemberAssociationReportTest {
     @Test
     void an_erased_report_must_not_carry_live_fields() {
         assertThatThrownBy(() -> new MemberAssociationReport("evt_unit_00000000000002", SUBJECT,
-                2, "PROFILE_REQUIRED", "ERASED", "ERASED", 3L, "5", 3L, false, NOW))
+                SUBJECT, "dutch-development", "test", 2, "PROFILE_REQUIRED", "ERASED",
+                "ERASED", 3L, "5", 3L, false, NOW))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("live fields");
     }
@@ -30,30 +30,61 @@ class MemberAssociationReportTest {
     @Test
     void a_tombstone_without_a_retired_generation_is_rejected() {
         assertThatThrownBy(() -> new MemberAssociationReport("evt_unit_00000000000003", SUBJECT,
-                2, "PROFILE_REQUIRED", "ERASED", "ERASED", null, null, null, false, NOW))
+                SUBJECT, "dutch-development", "test", 2, "PROFILE_REQUIRED", "ERASED",
+                "ERASED", null, null, null, false, NOW))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("retiredGeneration");
     }
 
     @Test
-    void only_a_ready_active_report_grants_profile_access() {
-        assertThat(live("PROFILE_READY", "ACTIVE").grantsProfileAccess()).isTrue();
-        assertThat(live("PROFILE_REQUIRED", "ACTIVE").grantsProfileAccess()).isFalse();
-        assertThat(live("PROFILE_READY", "DELETION_PENDING").grantsProfileAccess()).isFalse();
-        assertThat(live("PROFILE_READY", "CLOSED").grantsProfileAccess()).isFalse();
+    void a_report_whose_aggregate_disagrees_with_its_payload_is_rejected() {
+        assertThatThrownBy(() -> new MemberAssociationReport("evt_unit_00000000000005",
+                "aps_other_012345678901234567", SUBJECT, "dutch-development", "test",
+                1, "PROFILE_READY", "ACTIVE", null, 1L, "5", null, false, NOW))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("aggregate.id");
+    }
+
+    @Test
+    void a_report_for_another_app_or_environment_does_not_belong_here() {
+        assertThat(liveFor("dutch-production", "test").belongsTo("dutch-development", "test"))
+                .isFalse();
+        assertThat(liveFor("dutch-development", "staging").belongsTo("dutch-development", "test"))
+                .isFalse();
+        assertThat(liveFor("dutch-development", "test").belongsTo("dutch-development", "test"))
+                .isTrue();
+    }
+
+    @Test
+    void a_non_canonical_profile_revision_is_rejected() {
+        assertThatThrownBy(() -> live("PROFILE_READY", "ACTIVE", null, "05"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("profileRevision");
+        assertThatThrownBy(() -> live("PROFILE_READY", "ACTIVE", null, "99999999999999999999"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("profileRevision");
     }
 
     @Test
     void a_stale_subject_identifier_is_rejected() {
         assertThatThrownBy(() -> new MemberAssociationReport("evt_unit_00000000000004",
-                "hid_0123456789012345678901", 1, "PROFILE_READY", "ACTIVE", null,
+                "hid_0123456789012345678901", "hid_0123456789012345678901",
+                "dutch-development", "test", 1, "PROFILE_READY", "ACTIVE", null,
                 1L, "5", null, false, NOW))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("appSubject");
+                .hasMessageContaining("pinned format");
     }
 
-    private static MemberAssociationReport live(String profileState, String lifecycleState) {
-        return new MemberAssociationReport("evt_unit_00000000000009", SUBJECT, 1, profileState,
-                lifecycleState, null, 1L, "5", null, false, NOW);
+    private static MemberAssociationReport live(String profileState, String lifecycleState,
+                                                Long generation, String profileRevision) {
+        return new MemberAssociationReport("evt_unit_00000000000009", SUBJECT, SUBJECT,
+                "dutch-development", "test", 1, profileState, lifecycleState, null,
+                generation, profileRevision, null, false, NOW);
+    }
+
+    private static MemberAssociationReport liveFor(String registration, String environment) {
+        return new MemberAssociationReport("evt_unit_00000000000010", SUBJECT, SUBJECT,
+                registration, environment, 1, "PROFILE_READY", "ACTIVE", null,
+                1L, "5", null, false, NOW);
     }
 }

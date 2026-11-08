@@ -40,7 +40,7 @@ class JdbcMemberMappingConsumerIntegrationTest {
         JdbcTemplate jdbc = new JdbcTemplate(new DriverManagerDataSource(
                 database.getJdbcUrl(), database.getUsername(), database.getPassword()));
         consumer = new JdbcMemberMappingConsumer(jdbc);
-        associations = new JdbcMemberAssociationReportConsumer(jdbc);
+        associations = new JdbcMemberAssociationReportConsumer(jdbc, "dutch-development", "test");
         resolver = new JdbcMemberResolver(jdbc);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(jdbc.getDataSource()));
     }
@@ -104,8 +104,9 @@ class JdbcMemberMappingConsumerIntegrationTest {
 
     static void ready(JdbcMemberAssociationReportConsumer consumer, String subject,
                       long revision, String eventId) {
-        consumer.consume(new MemberAssociationReport(eventId, subject, revision,
-                "PROFILE_READY", "ACTIVE", null, 1L, "1", null, false, NOW));
+        consumer.consume(new MemberAssociationReport(eventId, subject, subject,
+                "dutch-development", "test", revision, "PROFILE_READY", "ACTIVE",
+                null, 1L, "1", null, false, NOW));
     }
 
     private static MemberMappingEvent event(String eventId, String subject, String memberId,

@@ -38,7 +38,10 @@ public class PrivacyExportService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> export(String appSubject) {
-        MemberId actor = members.resolve(appSubject).orElseThrow(GroupAccessDeniedException::new);
+        // A data-subject export is a legal right: it must not depend on the profile
+        // readiness that gates financial work.
+        MemberId actor = members.resolveForDataSubjectRights(appSubject)
+                .orElseThrow(GroupAccessDeniedException::new);
         List<GroupView> visibleGroups = groups.findReadableBy(actor).stream()
                 .map(group -> group.view())
                 .toList();

@@ -125,7 +125,7 @@ class GatewayRoutingTest {
                         .header("X-Secret", "leak"))
                 .andExpect(status().isOk());
 
-        assertThat(UMS.lastSecret.get()).isNull();
+        assertThat(LEDGER.lastSecret.get()).isNull();
     }
 
     @Test

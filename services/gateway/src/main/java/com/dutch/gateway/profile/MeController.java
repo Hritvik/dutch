@@ -66,7 +66,12 @@ public class MeController {
                     .body(error("profile_required", "Complete your profile to continue.", correlation));
         }
 
-        Optional<String> member = members.memberFor(jwt.getSubject());
+        Optional<String> member;
+        try {
+            member = members.memberFor(jwt.getSubject());
+        } catch (UmsProfileSource.UnavailableException unavailable) {
+            return unavailable(correlation);
+        }
         if (member.isEmpty()) {
             // A ready profile is not Dutch membership: without the mapping nothing in
             // Ledger is addressable.

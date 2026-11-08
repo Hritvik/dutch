@@ -40,8 +40,13 @@ public class HttpMemberDirectory implements MemberDirectory {
                     .body(JsonNode.class);
             String memberId = body == null ? null : body.path("memberId").asText(null);
             return memberId == null || memberId.isBlank() ? Optional.empty() : Optional.of(memberId);
-        } catch (RestClientResponseException notFound) {
-            return Optional.empty();
+        } catch (RestClientResponseException response) {
+            if (response.getStatusCode().value() == 404) {
+                return Optional.empty();
+            }
+            // A 401 means the shared secret is wrong and a 5xx means Ledger is sick;
+            // neither is "no member", and neither should read as a permanent denial.
+            throw new UmsProfileSource.UnavailableException("Ledger mapping read failed", response);
         } catch (org.springframework.web.client.ResourceAccessException failure) {
             throw new UmsProfileSource.UnavailableException("Ledger mapping read failed", failure);
         }

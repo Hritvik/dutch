@@ -40,14 +40,14 @@ proxied, and the routing tests now prove the remaining surfaces still forward.
 | Duplicate, stale and restrictive facts | controller test plus the PROFILE-BINDING integration suite (revision ordering, erasure, readiness regression) |
 | Replay after restart | `a_duplicate_report_creates_one_binding_across_restart` (PROFILE-BINDING) |
 | Acknowledgement only after a durable outcome | the controller responds after `consume` returns inside its transaction |
-| `/me` and profile states through Gateway | `MeControllerTest` — ready, required, closed, missing mapping, missing display name, UMS unavailable |
+| `/me` and profile states through Gateway | `MeControllerTest` — ready, required, closed, missing lifecycle, missing mapping, missing display name, UMS unavailable; `MeRouteTest` — end-to-end against canonical UMS and Ledger stubs |
 | A ready profile without mapping cannot grant Ledger access | `MeControllerTest.a_ready_profile_without_a_mapping_is_forbidden` plus the Ledger resolver tests |
 | Endpoint and fixture evidence for UMS | `docs/architecture/profile-edge-wiring.md` plus the pinned fixtures |
 
 ## Verification
 
 ```bash
-./gradlew :services:ledger:test :services:gateway:test   # 228 + 35
+./gradlew :services:ledger:test :services:gateway:test   # 229 + 38
 cd contracts && npm test                                 # 19/19
 ./gradlew verifyServiceBoundaries verifyContracts
 ```
@@ -58,5 +58,10 @@ cd contracts && npm test                                 # 19/19
   matrix is published and tested on the Dutch side; the UMS relay must confirm it
   treats `200/202` as acknowledged, retries `5xx`, and does not retry `409/422/403/400`.
   Question filed with the UMS agent.
+- **`PROFILE_PROVISIONING`.** UMS's readiness enum has no provisioning value, so the
+  Gateway never emits it. If UMS adds one, the mapping is a one-line change.
+- **Ack durability is structural, not unit-proven.** The proxy commits before the
+  controller responds, and the controller catches only post-rollback outcomes; no
+  test fails if `@Transactional` were removed.
 - **Live canonical UMS on staging.** Proven here against a stand-in HTTP server and
   the pinned schema; no deployed UMS instance exists yet.

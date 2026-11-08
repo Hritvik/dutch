@@ -25,7 +25,8 @@ class AssociationReportControllerTest {
     void prepare() {
         consumer = Mockito.mock(JdbcMemberAssociationReportConsumer.class);
         mvc = MockMvcBuilders
-                .standaloneSetup(new AssociationReportController(consumer, TOKEN))
+                .standaloneSetup(new AssociationReportController(
+                        consumer, new com.fasterxml.jackson.databind.ObjectMapper(), TOKEN))
                 .build();
     }
 
@@ -100,6 +101,17 @@ class AssociationReportControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(report("PROFILE_READY", "ACTIVE", "\"generation\": 3,")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void a_bad_token_with_a_malformed_body_is_still_unauthorized() throws Exception {
+        mvc.perform(post("/internal/ums/association-reports")
+                        .header("X-Service-Token", "other")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not json"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(consumer);
     }
 
     @Test

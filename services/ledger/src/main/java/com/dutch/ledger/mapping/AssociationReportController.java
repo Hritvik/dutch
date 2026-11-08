@@ -33,11 +33,14 @@ public class AssociationReportController {
     private static final String HEADER = "X-Service-Token";
 
     private final JdbcMemberAssociationReportConsumer consumer;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final String serviceToken;
 
     public AssociationReportController(JdbcMemberAssociationReportConsumer consumer,
+                                       com.fasterxml.jackson.databind.ObjectMapper objectMapper,
                                        @Value("${dutch.ums.service-token:}") String serviceToken) {
         this.consumer = consumer;
+        this.objectMapper = objectMapper;
         // Never fall back to a shared constant: blank means this instance accepts no
         // producer until an operator configures the same secret on both sides.
         if (serviceToken == null || serviceToken.isBlank()) {
@@ -49,20 +52,20 @@ public class AssociationReportController {
 
     @PostMapping("/association-reports")
     ResponseEntity<Void> receive(@RequestHeader(value = HEADER, required = false) String token,
-                                 @RequestBody(required = false) JsonNode envelope) {
+                                 @RequestBody(required = false) String body) {
         if (token == null || !MessageDigest.isEqual(
                 serviceToken.getBytes(StandardCharsets.UTF_8),
                 token.getBytes(StandardCharsets.UTF_8))) {
             return ResponseEntity.status(401).build();
         }
-        if (envelope == null || envelope.isNull()) {
+        if (body == null || body.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
         MemberAssociationReport report;
         try {
-            report = parse(envelope);
-        } catch (IllegalArgumentException | DateTimeParseException invalid) {
+            report = parse(objectMapper.readTree(body));
+        } catch (IllegalArgumentException | DateTimeParseException | java.io.IOException invalid) {
             log.info("rejected malformed association report: {}", invalid.getMessage());
             return ResponseEntity.badRequest().build();
         }

@@ -33,11 +33,13 @@ public class HttpUmsProfileSource implements UmsProfileSource {
         JsonNode data = body.path("data");
         JsonNode state = data.has("state") ? data.path("state") : data;
         String readiness = state.path("readiness").asText(null);
-        String lifecycle = state.path("lifecycle").asText("ACTIVE");
+        String lifecycle = state.path("lifecycle").asText(null);
         if (readiness == null) {
             throw new UnavailableException("UMS status has no readiness", null);
         }
-        return new Status(readiness, lifecycle);
+        // A status document that omits the lifecycle is a degraded or version-skewed
+        // reply, not a ready profile: default to the restrictive value.
+        return new Status(readiness, lifecycle == null ? "UNKNOWN" : lifecycle);
     }
 
     @Override

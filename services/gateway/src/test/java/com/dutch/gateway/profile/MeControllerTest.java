@@ -56,6 +56,16 @@ class MeControllerTest {
     }
 
     @Test
+    void a_status_without_a_lifecycle_is_never_ready() {
+        MeController controller = new MeController(
+                profile("PROFILE_READY", null, "Ada"),
+                subject -> Optional.of("mem_test_0123456789"));
+
+        assertThat(data(controller.profileState(JWT, null)).get("state"))
+                .isEqualTo("PROFILE_REQUIRED");
+    }
+
+    @Test
     void a_closed_profile_is_never_ready() {
         MeController controller = new MeController(
                 profile("PROFILE_READY", "CLOSED", "Ada"),

@@ -104,11 +104,9 @@ public final class GatewayRoutingFilter extends OncePerRequestFilter {
 
     private URI target(HttpServletRequest request) {
         String path = request.getRequestURI();
-        String base = path.equals("/api/v1/me") || path.startsWith("/api/v1/me/")
-                ? routes.umsBaseUrl()
-                : path.startsWith("/api/v1/notifications")
-                        ? routes.notificationBaseUrl()
-                        : routes.ledgerBaseUrl();
+        String base = path.startsWith("/api/v1/notifications")
+                ? routes.notificationBaseUrl()
+                : routes.ledgerBaseUrl();
         String query = request.getQueryString();
         return URI.create(base + path + (query == null ? "" : "?" + query));
     }

@@ -8,9 +8,12 @@ records how the Gateway composes them and how UMS delivers association reports.
 
 `POST /internal/ums/association-reports`
 
-- Authentication: `X-Service-Token` matched in constant time against
-  `DUTCH_UMS_SERVICE_TOKEN`. A blank configuration generates a random token, so an
-  unconfigured instance accepts no producer.
+- Authentication: `X-Service-Token` compared with `MessageDigest.isEqual` against
+  `DUTCH_UMS_SERVICE_TOKEN` before the body is parsed, so a bad token cannot force a
+  parse. The comparison leaks only the secret's length. A blank configuration
+  generates a random token, so an unconfigured instance accepts no producer.
+- The same token also guards `GET /internal/members/by-subject`; separate tokens per
+  direction would be tighter and are a follow-up, not a current claim.
 - Body: the pinned envelope in `contracts/imported/ums/` (`ums.profile.association-report.v1`).
   UMS owns the schema; Dutch validates the fields it applies.
 - The request is applied inside one transaction. The response is written only after
@@ -32,8 +35,11 @@ records how the Gateway composes them and how UMS delivers association reports.
 
 1. Gateway calls UMS `GET /api/v1/profile/status` with the caller's bearer token.
 2. It maps readiness to the Dutch contract: `PROFILE_READY` + `ACTIVE` → `PROFILE_READY`,
-   anything else → `PROFILE_REQUIRED`.
+   anything else → `PROFILE_REQUIRED`. UMS's readiness enum carries only
+   `PROFILE_REQUIRED`/`PROFILE_READY`, so Dutch's `PROFILE_PROVISIONING` is not
+   produced by this path; a missing lifecycle is treated as restrictive, never ACTIVE.
 3. UMS unavailable → `503` with the Dutch error envelope and a correlation id.
+   Ledger 404 → mapping absent; Ledger 401/5xx → `503`, never a permanent `403`.
 
 `GET /api/v1/me`
 

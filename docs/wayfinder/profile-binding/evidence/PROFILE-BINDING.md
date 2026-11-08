@@ -74,7 +74,7 @@ Financial access stays gated; the export path does not.
 | `PROFILE_READY` with the mapping absent denies Ledger access | `a_ready_report_grants_access_only_when_the_mapping_exists` |
 | Erasure cannot be associated | `an_erased_binding_denies_access`, `a_live_report_reusing_a_retired_generation_is_refused` |
 | A report without a member is held visibly | `a_report_without_a_member_is_held_unreconciled` plus the two gauges |
-| Duplicate event id with another payload is a conflict | `a_reused_event_id_with_another_payload_is_a_conflict`, `a_reused_event_id_with_another_profile_revision_is_a_conflict` |
+| Duplicate event id with another payload is a conflict | `a_reused_event_id_with_another_payload_is_a_conflict`, `a_reused_event_id_with_another_profile_revision_is_a_conflict`, `an_event_id_reused_for_another_subject_is_a_conflict` |
 | Stale revisions never regress readiness | `a_stale_report_does_not_regress_readiness` |
 | A slow lower revision cannot overwrite a newer fact | `a_slow_lower_revision_cannot_overwrite_a_newer_restrictive_fact` |
 | Concurrent duplicate delivery applies once | `two_concurrent_deliveries_of_one_report_apply_once` |
@@ -82,13 +82,13 @@ Financial access stays gated; the export path does not.
 | Closure and deletion-pending deny financial access | `closure_and_pending_deletion_deny_access` |
 | A report for another app registration is refused | `a_report_for_another_app_registration_is_refused`, `a_report_for_another_environment_is_refused` |
 | A new generation is accepted; a late erasure below it is refused | `a_new_generation_is_accepted_and_a_late_erasure_below_it_is_refused` |
-| Data-subject rights survive readiness regression and outage | `data_subject_rights_survive_a_readiness_regression_and_outage` |
+| Data-subject rights survive readiness regression and outage | `data_subject_rights_survive_a_readiness_regression_and_outage`, `data_subject_rights_still_require_an_active_mapping` |
 | The outage direction is countable | `the_outage_direction_is_countable` |
 
 ## Verification
 
 ```bash
-./gradlew :services:ledger:test        # 219 tests, 0 failures
+./gradlew :services:ledger:test        # 221 tests, 0 failures
 cd contracts && npm test               # 19/19
 ./gradlew verifyServiceBoundaries verifyContracts
 ```

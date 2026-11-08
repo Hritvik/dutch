@@ -381,4 +381,27 @@ class JdbcMemberAssociationReportConsumerIntegrationTest {
         assertThat(registry.get("dutch.ledger.association.unreconciled").gauge().value())
                 .isGreaterThanOrEqualTo(0.0d);
     }
+
+    @Test
+    void an_event_id_reused_for_another_subject_is_a_conflict() {
+        String first = "aps_evt_a_0123456789012345678";
+        String second = "aps_evt_b_0123456789012345678";
+        consume(ready(first, 1, "evt_shared_00000000000001", 1L));
+
+        assertThatThrownBy(() -> consume(ready(second, 1, "evt_shared_00000000000001", 1L)))
+                .isInstanceOf(MemberMappingConflictException.class);
+        assertThat(resolve(second)).isEmpty();
+    }
+
+    @Test
+    void data_subject_rights_still_require_an_active_mapping() {
+        String subject = "aps_rights_2123456789012345678";
+        transactions.execute(status -> mappings.consume(new MemberMappingEvent(
+                "evt_rights_00000000000003", subject, "mem_rights_2123456789", 1,
+                "DEPARTED", NOW)));
+
+        java.util.Optional<MemberId> rights = transactions.execute(
+                status -> resolver.resolveForDataSubjectRights(subject));
+        assertThat(rights).isEmpty();
+    }
 }

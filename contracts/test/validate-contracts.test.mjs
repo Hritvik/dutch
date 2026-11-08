@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
@@ -10,7 +11,8 @@ import {
   findSensitiveValues,
   validateContracts,
   validateEventFixture,
-  validateHttpFixture
+  validateHttpFixture,
+  validateUmsAssociationReportFixture
 } from '../validate-contracts.mjs';
 
 const contractsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -195,4 +197,31 @@ test('requires the split-specific input in the expense contract', async () => {
     contractsRoot, 'CreateExpenseRequest', fixture, 'http/ledger/openapi.yaml');
   assert.equal(result.valid, false);
   assert.match(result.issues.join('\n'), /exactShares/);
+});
+
+test('pins the UMS association report schema and its accepted and rejected fixtures', async () => {
+  const accepted = await validateUmsAssociationReportFixture(
+    contractsRoot, 'fixtures/association-report.json');
+  assert.deepEqual(accepted, { valid: true, issues: [] });
+
+  for (const fixture of [
+    'fixtures/association-report-invalid-display.json',
+    'fixtures/association-report-invalid-environment.json',
+    'fixtures/association-report-invalid-tombstone.json'
+  ]) {
+    const result = await validateUmsAssociationReportFixture(contractsRoot, fixture);
+    assert.equal(result.valid, false, `${fixture} must be rejected`);
+  }
+});
+
+test('the pinned UMS copy matches the recorded digests', async () => {
+  const pinned = await readFile(
+    path.join(contractsRoot, 'imported/ums/PINNED.md'), 'utf8');
+  const rows = [...pinned.matchAll(/\| `([^`]+)`(?: \(schema\))? \| `([a-f0-9]{64})` \|/g)];
+  assert.ok(rows.length >= 6, 'PINNED.md must list every pinned file');
+  for (const [, relative, expected] of rows) {
+    const file = await readFile(path.join(contractsRoot, 'imported/ums', relative));
+    const actual = createHash('sha256').update(file).digest('hex');
+    assert.equal(actual, expected, `${relative} drifted from its pinned digest`);
+  }
 });

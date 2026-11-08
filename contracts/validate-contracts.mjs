@@ -36,6 +36,17 @@ function createValidator() {
   return ajv;
 }
 
+/**
+ * Pinned third-party schemas are not ours to tighten. The UMS schema uses
+ * `required` inside `not` without redefining the property, which Ajv strict mode
+ * rejects even though the schema is valid JSON Schema.
+ */
+function createPinnedValidator() {
+  const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
+  addFormats(ajv);
+  return ajv;
+}
+
 function formatErrors(errors = []) {
   return errors.map((error) => `${error.instancePath || '/'} ${error.message}`);
 }
@@ -172,6 +183,26 @@ const httpFixtures = [
   ['ledger-sync-snapshot-page', 'SyncSnapshotPageResponse', 'http/fixtures/ledger/sync-snapshot-page.json', 'http/ledger/openapi.yaml']
 ];
 
+
+const umsPinnedRelative = 'imported/ums';
+
+/**
+ * Validates a pinned UMS association-report fixture. UMS owns the schema; Dutch
+ * only checks that the copy it consumes still accepts and rejects the same inputs.
+ */
+export async function validateUmsAssociationReportFixture(contractsRoot, relativePath) {
+  const ajv = createPinnedValidator();
+  const common = await readJson(path.join(contractsRoot, umsPinnedRelative, 'common.json'));
+  const schema = await readJson(
+    path.join(contractsRoot, umsPinnedRelative, 'association-report.json'));
+  ajv.addSchema(common);
+  const validate = ajv.compile(schema);
+  const fixture = await readJson(path.join(contractsRoot, umsPinnedRelative, relativePath));
+  const issues = findSensitiveValues(fixture, '$', { allowProtected: true });
+  if (!validate(fixture)) issues.push(...formatErrors(validate.errors));
+  return { valid: issues.length === 0, issues };
+}
+
 export async function validateContracts(contractsRoot, overrides = {}) {
   const issues = [];
   for (const [label, schemaName, relative, contract] of httpFixtures) {
@@ -194,6 +225,21 @@ export async function validateContracts(contractsRoot, overrides = {}) {
     contractsRoot, 'dutch.member-profile.mapping-changed.v1', forbiddenEvent);
   if (forbiddenResult.valid) {
     issues.push('mapping event forbidden fixture must be rejected');
+  }
+
+
+  const umsReports = [
+    ['valid', 'fixtures/association-report.json', true],
+    ['display-bearing', 'fixtures/association-report-invalid-display.json', false],
+    ['unknown-environment', 'fixtures/association-report-invalid-environment.json', false],
+    ['mixed tombstone', 'fixtures/association-report-invalid-tombstone.json', false]
+  ];
+  for (const [label, relative, expected] of umsReports) {
+    const result = await validateUmsAssociationReportFixture(contractsRoot, relative);
+    if (result.valid !== expected) {
+      issues.push(`UMS association report ${label} fixture: expected valid=${expected}`
+        + `, got ${result.valid} ${result.issues.join('; ')}`);
+    }
   }
 
   return { valid: issues.length === 0, issues };

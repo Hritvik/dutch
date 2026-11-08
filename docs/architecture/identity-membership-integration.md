@@ -59,7 +59,9 @@ IAM publishes a JWKS endpoint and signs short-lived (maximum 15 minute) access t
 
 The Expo mobile client is a public OAuth client. It runs external-browser authorization code + S256 PKCE with an exact registered app redirect. It stores access/refresh material only in OS SecureStore. Refresh tokens rotate on every use; reuse revokes the entire family/session, triggers a security event, and requires reauthentication. Absolute session lifetime is 30 days; refresh, recovery, identifier changes, Privacy Export, deletion, and recovery-capable credential changes require recent reauthentication as already specified.
 
-Gateway performs coarse token/rate checks. UMS and Ledger independently validate signature, key ID, issuer, audience, expiry/not-before, session/Identity security state, and local deny-list events. Ledger maps the trusted Identity ID to its local UMS-fed authorization projection, resolves canonical aliases, then checks its current Group Membership. Missing, stale-invalid, locked, or inactive mappings fail closed. An inaccessible Ledger resource returns a non-enumerating `404`.
+Gateway performs coarse token/rate checks. UMS and Ledger independently validate signature, key ID, issuer, audience, expiry/not-before, session/Identity security state, and local deny-list events. Ledger maps the trusted Identity ID to its local UMS-fed authorization projection, resolves canonical aliases, then checks its current Group Membership. Missing, stale-invalid, locked, or inactive mappings fail closed.
+
+Ledger additionally requires the app-scoped profile binding UMS reports through `ums.profile.association-report.v1`: the profile must be `PROFILE_READY` and its lifecycle `ACTIVE`. A missing report (never sent, or lost to a provider outage), a readiness regression, closure, deletion, or erasure all deny Ledger access. The report never names a member and never creates a mapping; Dutch keeps the mapping, UMS keeps readiness, and the pinned schema lives read-only in `contracts/imported/ums/`. An inaccessible Ledger resource returns a non-enumerating `404`.
 
 ## Local projections and event recovery
 

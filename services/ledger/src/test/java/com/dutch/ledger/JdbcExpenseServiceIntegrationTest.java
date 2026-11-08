@@ -138,5 +138,12 @@ class JdbcExpenseServiceIntegrationTest {
                     (app_subject, member_id, lifecycle_state, mapping_version, source_event_id, updated_at)
                 VALUES (?, ?, 'ACTIVE', 1, ?, now())
                 """, subject, member.value(), UUID.randomUUID().toString());
+        // Ledger access also requires UMS to report the profile ready (ADR: fail closed).
+        jdbc.update("""
+                INSERT INTO ums_profile_binding
+                    (app_subject, binding_revision, profile_state, lifecycle_state,
+                     generation, retired_generation, content_obligation, source_event_id, updated_at)
+                VALUES (?, 1, 'PROFILE_READY', 'ACTIVE', 1, NULL, false, ?, now())
+                """, subject, UUID.randomUUID().toString());
     }
 }

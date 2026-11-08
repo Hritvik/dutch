@@ -109,6 +109,9 @@ cd contracts && npm test               # 19/19
   defaults in staging or production fails closed by rejecting every report, which
   denies all Ledger access. The properties are declared in the ledger
   `application.yaml` with those environment variable placeholders.
+- **Notification is not gated the same way.** `services/notification` resolves the
+  member from the mapping alone; the readiness gate added here covers Ledger. Making
+  notification readiness-aware is a separate change with its own blast radius.
 - **Death signal for a refused generation.** `RetiredGenerationException` is not
   surfaced as a metric; a subject blocked by a renumbered generation would only be
   visible in logs.

@@ -60,3 +60,8 @@ out/
 *.p12
 *.pfx
 *.keystore
+
+# Local agent wiring and scratch notes
+.codex/
+.opencode/
+.scratch/

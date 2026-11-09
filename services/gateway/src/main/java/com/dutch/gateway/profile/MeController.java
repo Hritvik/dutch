@@ -78,7 +78,7 @@ public class MeController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .cacheControl(CacheControl.noStore())
                     .header(CorrelationId.HEADER, correlation)
-                    .body(error("forbidden", "This resource is unavailable.", correlation));
+                    .body(error("forbidden", "Access is denied", correlation));
         }
 
         Optional<String> displayName;
@@ -108,7 +108,7 @@ public class MeController {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .cacheControl(CacheControl.noStore())
                 .header(CorrelationId.HEADER, correlation)
-                .body(error("service_unavailable", "Try again shortly.", correlation));
+                .body(error("service_unavailable", "Service is temporarily unavailable", correlation));
     }
 
     private static java.util.Map<String, Object> error(String code, String message,

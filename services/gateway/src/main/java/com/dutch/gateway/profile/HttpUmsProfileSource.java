@@ -51,12 +51,16 @@ public class HttpUmsProfileSource implements UmsProfileSource {
 
     private JsonNode get(String path, String bearerToken) {
         try {
-            return client.get()
+            JsonNode body = client.get()
                     .uri(path)
                     .header(HttpHeaders.AUTHORIZATION, bearerToken)
                     .header(HttpHeaders.CACHE_CONTROL, "no-store")
                     .retrieve()
                     .body(JsonNode.class);
+            if (body == null) {
+                throw new UnavailableException("UMS profile read returned no body", null);
+            }
+            return body;
         } catch (RestClientResponseException | org.springframework.web.client.ResourceAccessException failure) {
             throw new UnavailableException("UMS profile read failed", failure);
         }

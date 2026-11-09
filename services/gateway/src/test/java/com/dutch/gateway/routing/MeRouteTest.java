@@ -96,7 +96,8 @@ class MeRouteTest {
 
         mockMvc.perform(get("/api/v1/me").header("Authorization", "Bearer valid"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("forbidden"));
+                .andExpect(jsonPath("$.error.code").value("forbidden"))
+                .andExpect(jsonPath("$.error.message").value("Access is denied"));
     }
 
     private void authenticate(String subject) {

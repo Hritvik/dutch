@@ -35,7 +35,7 @@ proxied, and the routing tests now prove the remaining surfaces still forward.
 
 | Requirement | Evidence |
 | --- | --- |
-| Authenticated delivery into the existing consumer | `AssociationReportControllerTest` — 7 tests: 202 applied, 200 duplicate, 401 wrong/missing token (consumer untouched), 409 conflict, 422 retired generation, 403 foreign scope, 400 malformed |
+| Authenticated delivery into the existing consumer | `AssociationReportControllerTest` — 8 tests: 202 applied, 200 duplicate, 401 wrong/missing token (consumer untouched), 409 conflict, 422 retired generation, 403 foreign scope, 400 malformed |
 | Wrong authority and scope denied | token tests and `ForeignAssociationReportException` → 403 |
 | Duplicate, stale and restrictive facts | controller test plus the PROFILE-BINDING integration suite (revision ordering, erasure, readiness regression) |
 | Replay after restart | `a_duplicate_report_creates_one_binding_across_restart` (PROFILE-BINDING) |
@@ -47,10 +47,18 @@ proxied, and the routing tests now prove the remaining surfaces still forward.
 ## Verification
 
 ```bash
-./gradlew :services:ledger:test :services:gateway:test   # 229 + 38
+./gradlew :services:ledger:test :services:gateway:test   # 229 + 38 (75 ledger tests are Testcontainers-gated)
 cd contracts && npm test                                 # 19/19
 ./gradlew verifyServiceBoundaries verifyContracts
 ```
+
+## Review rounds
+
+Round 1 (event 774) requested changes: the `/me` 403 and 503 bodies used messages the
+published `ErrorResponse` schema rejects. Both now use the pinned strings
+(`Access is denied`, `Service is temporarily unavailable`) and the tests assert the
+message, not just the code. A UMS 200 with an empty body now maps to `503` rather than
+a `NullPointerException`.
 
 ## Not proven here
 
@@ -63,5 +71,8 @@ cd contracts && npm test                                 # 19/19
 - **Ack durability is structural, not unit-proven.** The proxy commits before the
   controller responds, and the controller catches only post-rollback outcomes; no
   test fails if `@Transactional` were removed.
+- **Testcontainers skips.** Without Docker, 75 ledger tests skip silently, including the
+  association-consumer integration suite, so a local run can look green with the
+  delivery guarantees unexercised.
 - **Live canonical UMS on staging.** Proven here against a stand-in HTTP server and
   the pinned schema; no deployed UMS instance exists yet.

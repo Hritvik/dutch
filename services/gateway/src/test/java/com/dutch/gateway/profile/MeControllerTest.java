@@ -39,6 +39,7 @@ class MeControllerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(error(response).get("code")).isEqualTo("forbidden");
+        assertThat(error(response).get("message")).isEqualTo("Access is denied");
     }
 
     @Test
@@ -53,6 +54,7 @@ class MeControllerTest {
         assertThat(data(state).get("state")).isEqualTo("PROFILE_REQUIRED");
         assertThat(me.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(error(me).get("code")).isEqualTo("profile_required");
+        assertThat(error(me).get("message")).isEqualTo("Complete your profile to continue.");
     }
 
     @Test
@@ -108,6 +110,7 @@ class MeControllerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getHeaders().getFirst("X-Correlation-ID")).isEqualTo("corr-1");
         assertThat(error(response).get("code")).isEqualTo("service_unavailable");
+        assertThat(error(response).get("message")).isEqualTo("Service is temporarily unavailable");
     }
 
     private static Map<?, ?> data(ResponseEntity<?> response) {

@@ -14,6 +14,13 @@ records how the Gateway composes them and how UMS delivers association reports.
   generates a random token, so an unconfigured instance accepts no producer.
 - The same token also guards `GET /internal/members/by-subject`; separate tokens per
   direction would be tighter and are a follow-up, not a current claim.
+- `/internal/**` is permitted by the servlet security chain and relies on that header
+  alone: no user authentication, no rate limit. A shared-secret brute force is bounded
+  only by the network path, so the ingress must not be exposed beyond the private
+  service network.
+- Deployment must set `DUTCH_UMS_SERVICE_TOKEN` on Ledger and
+  `dutch.gateway.ums-service-token` on the Gateway to the same value, plus
+  `DUTCH_UMS_APP_REGISTRATION_ID` and `DUTCH_UMS_ENVIRONMENT` on Ledger.
 - Body: the pinned envelope in `contracts/imported/ums/` (`ums.profile.association-report.v1`).
   UMS owns the schema; Dutch validates the fields it applies.
 - The request is applied inside one transaction. The response is written only after
@@ -24,10 +31,12 @@ records how the Gateway composes them and how UMS delivers association reports.
 | Applied | `202` | Durable. Never needs redelivery. |
 | Duplicate or stale revision | `200` | Already reflected; safe to acknowledge. |
 | Reused event id with another payload | `409` | Do not retry unchanged; the producer sent conflicting facts. |
-| Live report reusing a retired generation | `422` | Permanent; retrying cannot succeed. |
+| Live report reusing a retired generation, an erasure watermark moving backwards, or an erasure below the recorded generation | `422` | Permanent; retrying cannot succeed and the producer's state disagrees with what Dutch already recorded. |
 | Report for another app registration or environment | `403` | Misrouted; fix the producer's scope. |
 | Unknown or malformed body | `400` | Fix the producer; retrying unchanged cannot succeed. |
 | Bad or missing token | `401` | Configure the shared secret. |
+| Wrong content type | `415` | Send `application/json`; a retry of the same request cannot succeed. |
+| Dutch unavailable or internal failure | `5xx` | Retry with backoff; the outcome is unknown and the producer must not assume the fact landed. |
 
 ## Edge translation (Gateway)
 

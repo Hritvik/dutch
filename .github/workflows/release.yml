@@ -50,7 +50,7 @@ jobs:
         run: |
           echo "${{ matrix.service }} ${{ steps.build.outputs.digest }}" \
             >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/attest-build-provenance@v1
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-name: ghcr.io/${{ github.repository }}/${{ matrix.service }}
           subject-digest: ${{ steps.build.outputs.digest }}
